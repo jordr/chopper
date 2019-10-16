@@ -80,7 +80,13 @@ namespace {
   InputFile(cl::desc("<input bytecode>"), cl::Positional, cl::init("-"));
 
   cl::opt<std::string> SkippedFunctions(
-      "skip-functions",
+      "skip-functions-not",
+      cl::desc("Comma-separated list of functions NOT to skip. "
+               "Optionally, a line number can be specified to choose a specific call site "
+               "(e.g. <function1>[:line],<function2>[:line],..)"));
+
+  cl::opt<std::string> OldSkippedFunctions(
+      "old-skip-functions",
       cl::desc("Comma-separated list of functions to skip. "
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));

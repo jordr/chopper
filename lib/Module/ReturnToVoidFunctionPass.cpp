@@ -34,12 +34,18 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   }
 
   bool changed = false;
+  bool isSkipped = true; //JOR
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
-      Function *wrapper = createWrapperFunction(f, module);
-      replaceCalls(&f, wrapper, i->lines);
-      changed = true;
+      isSkipped = false; 
+      break;
     }
+  }
+  if(isSkipped) {
+    Function *wrapper = createWrapperFunction(f, module);
+    std::vector<unsigned int> empty_lines; // JOR hax
+    replaceCalls(&f, wrapper, empty_lines);
+    changed = true;
   }
 
   return changed;

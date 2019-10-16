@@ -1974,6 +1974,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       terminateStateOnExecError(state, "inline assembly is unsupported");
       break;
     }
+
     // evaluate arguments
     std::vector< ref<Expr> > arguments;
     arguments.reserve(numArgs);
@@ -1982,6 +1983,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       arguments.push_back(eval(ki, j+1, state).value);
 
     if (f) {
+      // JOR: debugging
+      klee_warning("\tCALLING function: %s", f->getName().str().c_str());
+
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
       const FunctionType *fpType =
@@ -4785,27 +4789,34 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
+    bool skipped = true;
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
-        if ((option.name == f->getName().str())) {
-            Instruction *callInst = state.prevPC->inst;
-            const InstructionInfo &info = kmodule->infos->getInfo(callInst);
-            const std::vector<unsigned int> &lines = option.lines;
-
-            /* skip any call site */
-            if (lines.empty()) {
-                return true;
-            }
-
-            /* check if we have debug information */
-            if (info.line == 0) {
-                klee_warning_once(0, "call filter for %s: debug info not found...", option.name.data());
-                return true;
-            }
-
-            return std::find(lines.begin(), lines.end(), info.line) != lines.end();
-        }
+        if ((option.name == f->getName().str()))
+            skipped = false;
+        break;
     }
+    if (skipped) {
+        Instruction *callInst = state.prevPC->inst;
+        const InstructionInfo &info = kmodule->infos->getInfo(callInst);
+        // const std::vector<unsigned int> &lines = option.lines;
+
+        klee_warning("skipping all calls to: %s", f->getName().str().data());
+        /* skip any call site */
+        // if (lines.empty()) {
+            return true;
+        // }
+#if 0
+
+        /* check if we have debug information */
+        if (info.line == 0) {
+            klee_warning_once(0, "call filter for %s: debug info not found...", f->getName().str().data());
+            return true;
+        }
+
+        return std::find(lines.begin(), lines.end(), info.line) != lines.end();
+#endif
+      }
 
     return false;
 }
