@@ -9,6 +9,7 @@
 
 #include "Passes.h"
 
+#include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/CFG.h"
@@ -38,6 +39,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
       isSkipped = false; 
+      klee_warning("Not skipping %s", i->name.c_str());
       break;
     }
   }
