@@ -462,6 +462,7 @@ const Module *Executor::setModule(llvm::Module *module,
     std::vector<std::string> targets;
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
       targets.push_back(i->name);
+      klee_warning("targets.push_back(%s);", i->name.c_str());
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
