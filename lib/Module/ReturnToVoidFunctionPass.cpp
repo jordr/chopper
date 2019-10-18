@@ -29,21 +29,24 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  // skip void functions
+  klee_warning("runOnFunction(f=%s)", f.getName().str().c_str());
+  // skip void functions //JOR: WHY???
   if (f.getReturnType()->isVoidTy()) {
+    klee_warning("\tisVoid: %s", f.getName().str().c_str());
     return false;
   }
-
+  
   bool changed = false;
   bool isSkipped = true; //JOR
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
       isSkipped = false; 
-      klee_warning("Not skipping %s", i->name.c_str());
+      klee_warning("\tNot skipping %s", i->name.c_str());
       break;
     }
   }
   if(isSkipped) {
+    klee_warning("\tSkipping %s", f.getName().str().c_str());
     Function *wrapper = createWrapperFunction(f, module);
     std::vector<unsigned int> empty_lines; // JOR hax
     replaceCalls(&f, wrapper, empty_lines);
@@ -57,9 +60,14 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
 ///  1- takes as first argument a variable __result that will contain the result
 ///  2- calls f and stores the return value in __result
 Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Module &module) {
+  // JOR
+  klee_message("\t createWrapperFunction(f=%s)", f.getName().str().c_str());
+
   // create new function parameters: *return_var + original function's parameters
   vector<Type *> paramTypes;
   Type *returnType = f.getReturnType();
+  
+  assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type for some reason");
   paramTypes.push_back(PointerType::get(returnType, 0));
   paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
 

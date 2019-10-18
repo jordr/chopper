@@ -461,7 +461,7 @@ const Module *Executor::setModule(llvm::Module *module,
     /* build target functions */
     std::vector<std::string> targets;
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-      targets.push_back(i->name);
+      // targets.push_back(i->name);
       klee_warning("targets.push_back(%s);", i->name.c_str());
     }
 
@@ -4790,11 +4790,14 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
-    bool skipped = true;
+    bool skipped = false;
+    //JOR: this seems to parse wrappers only, so only skipped functions?
+    klee_message("isFunctionToSkip(f=%s)...", f->getName().str().c_str());
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
+        klee_warning("SkippedFunctionOption = %s", option.name.c_str());
         if ((option.name == f->getName().str()))
-            skipped = false;
+            skipped = true;
         break;
     }
     if (skipped) {
@@ -4802,10 +4805,11 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
         const InstructionInfo &info = kmodule->infos->getInfo(callInst);
         // const std::vector<unsigned int> &lines = option.lines;
 
-        klee_warning("skipping all calls to: %s", f->getName().str().data());
+        klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());
         /* skip any call site */
         // if (lines.empty()) {
             return true;
+    klee_message("                          ...YES");
         // }
 #if 0
 
@@ -4819,6 +4823,7 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
 #endif
       }
 
+    klee_message("                          ...NO");
     return false;
 }
 
