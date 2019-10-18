@@ -30,7 +30,7 @@ char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
   klee_warning("runOnFunction(f=%s)", f.getName().str().c_str());
-  // skip void functions //JOR: WHY???
+  // don't check void functions //JOR: WHY???
   if (f.getReturnType()->isVoidTy()) {
     klee_warning("\tisVoid: %s", f.getName().str().c_str());
     return false;
@@ -41,12 +41,12 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
       isSkipped = false; 
-      klee_warning("\tNot skipping %s", i->name.c_str());
+      klee_warning("\tNot voiding %s", i->name.c_str());
       break;
     }
   }
   if(isSkipped) {
-    klee_warning("\tSkipping %s", f.getName().str().c_str());
+    klee_warning("\tVoiding %s", f.getName().str().c_str());
     Function *wrapper = createWrapperFunction(f, module);
     std::vector<unsigned int> empty_lines; // JOR hax
     replaceCalls(&f, wrapper, empty_lines);
