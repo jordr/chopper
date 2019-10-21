@@ -1704,6 +1704,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     return;
   }
 
+  klee_warning("executeInstruction(i=%s)", i->getOpcodeName());
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -4790,16 +4791,19 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
-    bool skipped = false;
+    bool skipped = true;
     //JOR: this seems to parse wrappers only, so only skipped functions?
     klee_message("isFunctionToSkip(f=%s)...", f->getName().str().c_str());
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
-        klee_warning("SkippedFunctionOption = %s", option.name.c_str());
-        if ((option.name == f->getName().str()))
-            skipped = true;
-        break;
+        klee_warning_once(option.name.c_str(), "[ONCE] SkippedFunctionOption = %s", option.name.c_str());
+        if ((option.name == "__wrap_" + f->getName().str())) {
+          skipped = false;
+          break;
+        }
     }
+    if(f->getName().str().find("__uClibc") == 0)
+        skipped = false;
     if (skipped) {
         Instruction *callInst = state.prevPC->inst;
         const InstructionInfo &info = kmodule->infos->getInfo(callInst);
@@ -4808,8 +4812,8 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
         klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());
         /* skip any call site */
         // if (lines.empty()) {
-            return true;
-    klee_message("                          ...YES");
+        klee_message("                          ...YES");
+        return true;
         // }
 #if 0
 
