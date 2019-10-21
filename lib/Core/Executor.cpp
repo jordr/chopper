@@ -1704,7 +1704,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     return;
   }
 
-  klee_warning("executeInstruction(i=%s)", i->getOpcodeName());
+  klee_warning(" INST [%s]", i->getOpcodeName());
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -4801,8 +4801,8 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     klee_message("isFunctionToSkip(f=%s)...", f->getName().str().c_str());
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
-        klee_warning_once(option.name.c_str(), "[ONCE] SkippedFunctionOption = %s", option.name.c_str());
-        if ((option.name == "__wrap_" + f->getName().str())) {
+        klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
+        if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
           skipped = false;
           break;
         }
