@@ -2651,6 +2651,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         Result = true;
         break;
       }
+      [[fallthrough]];
     case FCmpInst::FCMP_OEQ:
       Result = CmpRes == APFloat::cmpEqual;
       break;
@@ -2660,6 +2661,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         Result = true;
         break;
       }
+      [[fallthrough]];
     case FCmpInst::FCMP_OGT:
       Result = CmpRes == APFloat::cmpGreaterThan;
       break;
@@ -2669,6 +2671,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         Result = true;
         break;
       }
+      [[fallthrough]];
     case FCmpInst::FCMP_OGE:
       Result = CmpRes == APFloat::cmpGreaterThan || CmpRes == APFloat::cmpEqual;
       break;
@@ -2678,6 +2681,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         Result = true;
         break;
       }
+      [[fallthrough]];
     case FCmpInst::FCMP_OLT:
       Result = CmpRes == APFloat::cmpLessThan;
       break;
@@ -2687,6 +2691,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         Result = true;
         break;
       }
+      [[fallthrough]];
     case FCmpInst::FCMP_OLE:
       Result = CmpRes == APFloat::cmpLessThan || CmpRes == APFloat::cmpEqual;
       break;
