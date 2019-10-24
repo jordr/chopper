@@ -1704,7 +1704,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     return;
   }
 
-  klee_warning(" INST [%s]", i->getOpcodeName());
+  // klee_warning(" INST [%s]", i->getOpcodeName());
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -4798,17 +4798,21 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     bool skipped = true;
     //JOR: this seems to parse wrappers only, so only skipped functions?
-    klee_message("isFunctionToSkip(f=%s)...", f->getName().str().c_str());
+    klee_message("isFunctionToSkip(f=\e[0;96m%s\e[0;m)...", f->getName().str().c_str());
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
         klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
         if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
+          // JOR TODO: do not skip non wrappers, that's dangerous? I think the problem is on the wrapper generation
           skipped = false;
           break;
         }
     }
-    if(f->getName().str().find("__uClibc") == 0)
+    if(f->getName().str().find("__uClibc") == 0) // JOR: hax
+    {
+        klee_warning("Not skipping uclibc function");
         skipped = false;
+    }
     if (skipped) {
         Instruction *callInst = state.prevPC->inst;
         const InstructionInfo &info = kmodule->infos->getInfo(callInst);

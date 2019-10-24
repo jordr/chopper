@@ -200,6 +200,7 @@ void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Functio
 
 bool klee::ReturnToVoidFunctionPass::runOnModule(Module &module) {
   // we assume to have everything linked inside the single .bc file
+  assert(false);
   bool dirty = false;
   for (Module::iterator f = module.begin(), fe = module.end(); f != fe; ++f)
     dirty |= runOnFunction(*f, module);
