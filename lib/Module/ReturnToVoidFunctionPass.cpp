@@ -52,6 +52,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
     replaceCalls(&f, wrapper, empty_lines);
     changed = true;
   }
+  klee_warning("End of ReturnToVoidFunctionPass");
 
   return changed;
 }
@@ -70,7 +71,7 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
   assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type");
   paramTypes.push_back(PointerType::get(returnType, 0));
   paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
-
+  
   // create new void function
   FunctionType *newFunctionType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(paramTypes), f.isVarArg());
   string wrappedName = string("__wrap_") + f.getName().str();
@@ -87,10 +88,16 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
     arg->setName(origArg->getName());
     argsForCall.push_back(arg);
   }
+  klee_warning("\t\t[createWrapperFunction] Set the arguments");
+  if(f.getName().str().c_str()[0] == 'p')
+  {
+    klee_warning("!!");
+  }
 
   // create basic block 'entry' in the new function
   BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
   IRBuilder<> builder(block);
+  klee_warning("\t\t[createWrapperFunction] Create BB entry");
 
   // insert call to the original function
   Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
@@ -108,6 +115,7 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
   vector<CallInst*> to_remove;
   for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
     if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
+      klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName());
       if (inst->getParent()->getParent() == wrapper) {
         continue;
       }
@@ -122,11 +130,13 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
+        klee_warning("\treplaceCall to call=%d by f=%s", call, f->getName().str().c_str());
         replaceCall(call, f, wrapper);
         to_remove.push_back(call);
       }
     }
   }
+  klee_warning("end");
   for (auto ci = to_remove.begin(), ce = to_remove.end(); ci != ce; ci++) {
     (*ci)->eraseFromParent();
   }
@@ -171,7 +181,22 @@ void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Functio
   argsForCall.push_back(allocaInst);
   for (unsigned int i = 0; i < origCallInst->getNumArgOperands(); i++) {
     argsForCall.push_back(origCallInst->getArgOperand(i));
+
+    // JOR
+    std::string str;
+    llvm::raw_string_ostream ss(str);
+    ss << *origCallInst->getArgOperand(i);
+    ss << "(TYPE=" << *origCallInst->getArgOperand(i)->getType() << ")";
+    errs() << "\t- originalCall.argoperand[" << i << "] = " << ss.str() << "\n";
   }
+  klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands()); 
+  FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType()/* ->getNumParams() */);
+  const int wrapper_num_params = FTy->getNumParams();
+  klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType());
+
+  // assert(wrapper_num_params == origCallInst->getNumArgOperands()
+  //   || FTy->isVarArg() && origCallInst->getNumArgOperands() > wrapper_num_params);
+  
   CallInst *callInst = builder.CreateCall(wrapper, makeArrayRef(argsForCall));
   callInst->setDebugLoc(origCallInst->getDebugLoc());
 
