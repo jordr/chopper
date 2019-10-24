@@ -314,6 +314,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   // optimize is seeing what is as close as possible to the final
   // module.
   PassManager pm;
+  pm.add(new ReturnToVoidFunctionPass(skippedFunctions));
   pm.add(new RaiseAsmPass());
   if (opts.CheckDivZero) pm.add(new DivCheckPass());
   if (opts.CheckOvershift) pm.add(new OvershiftCheckPass());
@@ -323,6 +324,8 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   // issue.
   pm.add(new IntrinsicCleanerPass(*targetData, false));
   pm.run(*module);
+
+  
 
   if (opts.Optimize)
     Optimize(module, opts.EntryPoint);

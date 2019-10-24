@@ -29,8 +29,8 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  klee_warning("runOnFunction(f=%s)", f.getName().str().c_str());
-  // don't check void functions //JOR: WHY???
+  klee_warning("ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str());
+  // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
     klee_warning("\tisVoid: %s", f.getName().str().c_str());
     return false;
@@ -43,8 +43,8 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
       isSkipped = false; 
       klee_warning("\tNot voiding %s", i->name.c_str());
       break;
-    }
   }
+    }
   if(isSkipped) {
     klee_warning("\tVoiding %s", f.getName().str().c_str());
     Function *wrapper = createWrapperFunction(f, module);
@@ -67,7 +67,7 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
   vector<Type *> paramTypes;
   Type *returnType = f.getReturnType();
   
-  assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type for some reason");
+  assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type");
   paramTypes.push_back(PointerType::get(returnType, 0));
   paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
 
@@ -200,7 +200,6 @@ void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Functio
 
 bool klee::ReturnToVoidFunctionPass::runOnModule(Module &module) {
   // we assume to have everything linked inside the single .bc file
-  assert(false);
   bool dirty = false;
   for (Module::iterator f = module.begin(), fe = module.end(); f != fe; ++f)
     dirty |= runOnFunction(*f, module);
