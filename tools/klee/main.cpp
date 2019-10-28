@@ -1274,7 +1274,7 @@ void parseSkippingParameter(
         }
 
 		if (!f->getReturnType()->isVoidTy()) {
-		  fname = std::string("__wrap_") + fname;
+		  // fname = std::string("__wrap_") + fname; // JOR
 		}
         result.push_back(Interpreter::SkippedFunctionOption(fname, lines));
     }

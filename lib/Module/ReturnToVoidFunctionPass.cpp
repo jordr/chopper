@@ -130,7 +130,8 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
-        klee_warning("\treplaceCall to call=%d by f=%s", call, f->getName().str().c_str());
+        klee_warning("\treplaceCall to call=%d (%d args) by f=%s", 
+          call->getArgOperand(0), call->getOpcodeName(), call->getNumArgOperands(), f->getName().str().c_str());
         replaceCall(call, f, wrapper);
         to_remove.push_back(call);
       }
@@ -187,7 +188,15 @@ void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Functio
     llvm::raw_string_ostream ss(str);
     ss << *origCallInst->getArgOperand(i);
     ss << "(TYPE=" << *origCallInst->getArgOperand(i)->getType() << ")";
+    ss << "(TID=" << (origCallInst->getArgOperand(i)->getType()->getTypeID()) << ")";
     errs() << "\t- originalCall.argoperand[" << i << "] = " << ss.str() << "\n";
+  
+    // JOR hax
+    // if(origCallInst->getArgOperand(i)->getType()->getTypeID() == Type::TypeID::PointerTyID)
+    // {
+    //   klee_message("returning becauuse argoperand is type  .........  %d", Type::TypeID::PointerTyID);
+    //   return;
+    // }
   }
   klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands()); 
   FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType()/* ->getNumParams() */);
