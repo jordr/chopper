@@ -457,12 +457,17 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler = new SpecialFunctionHandler(*this);
   specialFunctionHandler->prepare();
 
-  if (!interpreterOpts.skippedFunctions.empty()) {
+  // JOR TODO: try disabling the whole thing or parts thereof for notskipped functions maybe?
+  if (!interpreterOpts.NotskippedFunctions.empty() || !interpreterOpts.LegacyskippedFunctions.empty()) {
     /* build target functions */
     std::vector<std::string> targets;
-    for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-      // targets.push_back(i->name);
+    for (auto i = interpreterOpts.LegacyskippedFunctions.begin(), e = interpreterOpts.LegacyskippedFunctions.end(); i != e; i++) {
+      targets.push_back(i->name);
       klee_warning("targets.push_back(%s);", i->name.c_str());
+    }
+    for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+      // targets.push_back(i->name);
+      klee_warning("NOT doing targets.push_back(%s);", i->name.c_str());
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
@@ -479,7 +484,7 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
-  kmodule->prepare(opts, interpreterOpts.skippedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  kmodule->prepare(opts, interpreterOpts.NotskippedFunctions, interpreterOpts.LegacyskippedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -4799,47 +4804,55 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
-    bool skipped = true;
-    //JOR: this seems to parse wrappers only, so only skipped functions?
-    klee_message("isFunctionToSkip(f=\e[0;96m%s\e[0;m)...", f->getName().str().c_str());
-    for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-        const SkippedFunctionOption &option = *i;
-        klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
-        if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
-          // JOR TODO: do not skip non wrappers, that's dangerous? I think the problem is on the wrapper generation
-          skipped = false;
-          break;
-        }
-    }
-    if(f->getName().str().find("__uClibc") == 0) // JOR: hax
+    // check NotskippedFunctions
     {
-        klee_warning("Not skipping uclibc function");
-        skipped = false;
-    }
-    if (skipped) {
-        Instruction *callInst = state.prevPC->inst;
-        const InstructionInfo &info = kmodule->infos->getInfo(callInst);
-        // const std::vector<unsigned int> &lines = option.lines;
+      bool skipped = true;
+      //JOR: this seems to parse wrappers only, so only skipped functions?
+      klee_message("isFunctionToSkip(f=\e[0;96m%s\e[0;m)...", f->getName().str().c_str());
+      for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+          const SkippedFunctionOption &option = *i;
+          klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
+          if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
+            // JOR TODO: do not skip non wrappers, that's dangerous? I think the problem is on the wrapper generation
+            skipped = false;
+            break;
+          }
+      }
+      if(f->getName().str().find("__uClibc") == 0) // JOR: hax
+      {
+          klee_warning("Not skipping uclibc function");
+          skipped = false;
+      }
+      if (skipped) {
+          Instruction *callInst = state.prevPC->inst;
+          const InstructionInfo &info = kmodule->infos->getInfo(callInst);
+          // const std::vector<unsigned int> &lines = option.lines;
 
-        klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());
-        /* skip any call site */
-        // if (lines.empty()) {
-        klee_message("                          ...YES");
-        return true;
-        // }
-#if 0
+          klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());
+          /* skip any call site */
+          // if (lines.empty()) {
+          klee_message("                          ...YES");
+          return true;
+          // }
+  #if 0
 
-        /* check if we have debug information */
-        if (info.line == 0) {
-            klee_warning_once(0, "call filter for %s: debug info not found...", f->getName().str().data());
-            return true;
+          /* check if we have debug information */
+          if (info.line == 0) {
+              klee_warning_once(0, "call filter for %s: debug info not found...", f->getName().str().data());
+              return true;
+          }
+
+          return std::find(lines.begin(), lines.end(), info.line) != lines.end();
+  #endif
         }
 
-        return std::find(lines.begin(), lines.end(), info.line) != lines.end();
-#endif
-      }
-
-    klee_message("                          ...NO");
+      klee_message("                          ...NO");
+    }
+    // check LegacyskippedFunctions
+    {
+      assert(interpreterOpts.LegacyskippedFunctions.empty());
+      // TODO import from working
+    }
     return false;
 }
 

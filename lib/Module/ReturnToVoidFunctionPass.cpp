@@ -37,22 +37,31 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   }
   
   bool changed = false;
-  bool isSkipped = true; //JOR
-  for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
-    if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
-      isSkipped = false; 
-      klee_warning("\tNot voiding %s", i->name.c_str());
-      break;
-  }
+  
+  if(!NotskippedFunctions.empty())
+  {
+    bool isSkipped = true; //JOR
+    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = NotskippedFunctions.begin(); i != NotskippedFunctions.end(); i++) {
+      if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
+        isSkipped = false; 
+        klee_warning("\tNot voiding %s", i->name.c_str());
+        break;
     }
-  if(isSkipped) {
-    klee_warning("\tVoiding %s", f.getName().str().c_str());
-    Function *wrapper = createWrapperFunction(f, module);
-    std::vector<unsigned int> empty_lines; // JOR hax
-    replaceCalls(&f, wrapper, empty_lines);
-    changed = true;
+      }
+    if(isSkipped) {
+      klee_warning("\tVoiding %s", f.getName().str().c_str());
+      Function *wrapper = createWrapperFunction(f, module);
+      std::vector<unsigned int> empty_lines; // JOR hax
+      replaceCalls(&f, wrapper, empty_lines);
+      changed = true;
+    }
+    klee_warning("End of ReturnToVoidFunctionPass");
   }
-  klee_warning("End of ReturnToVoidFunctionPass");
+  else
+  {
+    //TODO port back code from `working` branch
+  }
+  
 
   return changed;
 }

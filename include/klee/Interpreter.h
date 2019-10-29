@@ -106,7 +106,8 @@ public:
     typedef std::map<std::string, std::vector<unsigned> > ErrorLocations;
 
     unsigned MakeConcreteSymbolic;
-    std::vector<SkippedFunctionOption> skippedFunctions;
+    std::vector<SkippedFunctionOption> NotskippedFunctions;
+    std::vector<SkippedFunctionOption> LegacyskippedFunctions;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;

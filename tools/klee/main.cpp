@@ -79,14 +79,14 @@ namespace {
   cl::opt<std::string>
   InputFile(cl::desc("<input bytecode>"), cl::Positional, cl::init("-"));
 
-  cl::opt<std::string> SkippedFunctions(
+  cl::opt<std::string> NotSkippedFunctions(
       "skip-functions-not",
       cl::desc("Comma-separated list of functions NOT to skip. "
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));
 
-  cl::opt<std::string> OldSkippedFunctions(
-      "old-skip-functions",
+  cl::opt<std::string> LegacySkippedFunctions(
+      "skip-functions-legacy",
       cl::desc("Comma-separated list of functions to skip. "
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));
@@ -1491,8 +1491,12 @@ int main(int argc, char **argv, char **envp) {
     klee_error("'%s' function not found in module.", EntryPoint.c_str());
   }
 
-  std::vector<Interpreter::SkippedFunctionOption> skippingOptions;
-  parseSkippingParameter(mainModule, SkippedFunctions, skippingOptions);
+  std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
+  parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot);
+  std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
+  parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy);
+  if(!skippingOptionsNot.empty() && !skippingOptionsLegacy.empty())
+    klee_error("Cannot specify both --skip-functions-legacy and --skip-functions-not.");
 
   std::vector<std::string> inlinedFunctions;
   parseInlinedFunctions(mainModule, InlinedFunctions, inlinedFunctions);
@@ -1547,7 +1551,8 @@ int main(int argc, char **argv, char **envp) {
 
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
-  IOpts.skippedFunctions = skippingOptions;
+  IOpts.NotskippedFunctions = skippingOptionsNot;
+  IOpts.LegacyskippedFunctions = skippingOptionsLegacy;
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
@@ -1727,7 +1732,7 @@ int main(int argc, char **argv, char **envp) {
         << handler->getNumTestCases() << "\n";
 
   /* these are relevant only when we have a slicing option */
-  if (!IOpts.skippedFunctions.empty()) {
+  if (!IOpts.NotskippedFunctions.empty() || !IOpts.LegacyskippedFunctions.empty()) {
     stats << "KLEE: done: recovery states = "
           << handler->getRecoveryStatesCount() << "\n";
     stats << "KLEE: done: generated slices = "
