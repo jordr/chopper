@@ -59,9 +59,15 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   }
   else
   {
-    //TODO port back code from `working` branch
+    // legacy code
+    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = LegacyskippedFunctions.begin(); i != LegacyskippedFunctions.end(); i++) {
+      if (string("__wrap_") + f.getName().str() == i->name) {
+        Function *wrapper = createWrapperFunction(f, module);
+        replaceCalls(&f, wrapper, i->lines);
+        changed = true;
+      }
+    }
   }
-  
 
   return changed;
 }

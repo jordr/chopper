@@ -4848,10 +4848,29 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
 
       klee_message("                          ...NO");
     }
-    // check LegacyskippedFunctions
+    // legacy code - check LegacyskippedFunctions
     {
-      assert(interpreterOpts.LegacyskippedFunctions.empty());
-      // TODO import from working
+      for (auto i = interpreterOpts.LegacyskippedFunctions.begin(), e = interpreterOpts.LegacyskippedFunctions.end(); i != e; i++) {
+        const SkippedFunctionOption &option = *i;
+        if ((option.name == f->getName().str())) {
+            Instruction *callInst = state.prevPC->inst;
+            const InstructionInfo &info = kmodule->infos->getInfo(callInst);
+            const std::vector<unsigned int> &lines = option.lines;
+
+            /* skip any call site */
+            if (lines.empty()) {
+                return true;
+            }
+
+            /* check if we have debug information */
+            if (info.line == 0) {
+                klee_warning_once(0, "call filter for %s: debug info not found...", option.name.data());
+                return true;
+            }
+
+            return std::find(lines.begin(), lines.end(), info.line) != lines.end();
+        }
+      }
     }
     return false;
 }
