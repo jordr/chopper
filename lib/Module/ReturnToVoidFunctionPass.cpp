@@ -39,7 +39,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   bool changed = false;
   bool isSkipped = true; //JOR
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
-    if (string("__wrap_") + f.getName().str() == i->name) {
+    if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
       isSkipped = false; 
       klee_warning("\tNot voiding %s", i->name.c_str());
       break;
@@ -130,8 +130,9 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
-        klee_warning("\treplaceCall to call=%d (%d args) by f=%s", 
-          call->getArgOperand(0), call->getOpcodeName(), call->getNumArgOperands(), f->getName().str().c_str());
+        klee_warning("\treplaceCall to call, arg[0]=%s (%d args) by f=%s", 
+        //call->getNumArgOperands() ? call->getArgOperand(0)->getName() :
+           "", call->getNumArgOperands(), f->getName().str().c_str());
         replaceCall(call, f, wrapper);
         to_remove.push_back(call);
       }

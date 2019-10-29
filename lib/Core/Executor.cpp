@@ -2329,6 +2329,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Store: {
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
+    klee_warning("\e[0;31mINSTRUCTION STORE, DUMPING STACK");
+    state.dumpStack(llvm::errs());
     executeMemoryOperation(state, true, base, value, 0);
     break;
   }
@@ -3732,6 +3734,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   
   // XXX should we distinguish out of bounds and overlapped cases?
   if (unbound) {
+    klee_warning("UNBOUND, inst=%s", !target ? "null" : target->getOrigInst()->getOpcodeName());
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
