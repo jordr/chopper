@@ -2334,8 +2334,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Store: {
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
-    klee_warning("\e[0;31mINSTRUCTION STORE, DUMPING STACK");
-    state.dumpStack(llvm::errs());
+    // JOR
+    //klee_warning("\e[0;31mINSTRUCTION STORE, DUMPING STACK");
+    // state.dumpStack(llvm::errs());
     executeMemoryOperation(state, true, base, value, 0);
     break;
   }
@@ -4805,6 +4806,7 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // check NotskippedFunctions
+    if(!interpreterOpts.NotskippedFunctions.empty())
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?

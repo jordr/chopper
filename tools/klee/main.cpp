@@ -1257,7 +1257,8 @@ bool parseNameLineOption(
 void parseSkippingParameter(
     Module *module,
     std::string parameter,
-    std::vector<Interpreter::SkippedFunctionOption> &result
+    std::vector<Interpreter::SkippedFunctionOption> &result,
+    bool addWrap
 ) {
     std::istringstream stream(parameter);
     std::string token;
@@ -1274,7 +1275,8 @@ void parseSkippingParameter(
         }
 
 		if (!f->getReturnType()->isVoidTy()) {
-		  // fname = std::string("__wrap_") + fname; // JOR
+      if(addWrap)
+		    fname = std::string("__wrap_") + fname; // JOR
 		}
         result.push_back(Interpreter::SkippedFunctionOption(fname, lines));
     }
@@ -1492,9 +1494,9 @@ int main(int argc, char **argv, char **envp) {
   }
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
-  parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot);
+  parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
-  parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy);
+  parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy, true);
   if(!skippingOptionsNot.empty() && !skippingOptionsLegacy.empty())
     klee_error("Cannot specify both --skip-functions-legacy and --skip-functions-not.");
 
