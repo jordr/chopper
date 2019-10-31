@@ -209,7 +209,7 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
     ss << *origCallInst->getArgOperand(i);
     ss << "(TYPE=" << *origCallInst->getArgOperand(i)->getType() << ")";
     ss << "(TID=" << (origCallInst->getArgOperand(i)->getType()->getTypeID()) << ")";
-    errs() << "\t- originalCall.argoperand[" << i << "] = " << ss.str() << "\n";
+    klee_warning("\t- originalCall.argoperand[%d] = %s", i, ss.str().c_str());
   
     // JOR hax
     // if(origCallInst->getArgOperand(i)->getType()->getTypeID() == Type::TypeID::PointerTyID)

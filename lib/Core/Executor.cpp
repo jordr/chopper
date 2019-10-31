@@ -4810,7 +4810,7 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?
-      klee_message("isFunctionToSkip(f=\e[0;96m%s\e[0;m)...", f->getName().str().c_str());
+      klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str());
       for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
           const SkippedFunctionOption &option = *i;
           klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
