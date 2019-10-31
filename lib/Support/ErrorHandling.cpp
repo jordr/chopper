@@ -23,6 +23,7 @@ using namespace klee;
 
 FILE *klee::klee_warning_file = NULL;
 FILE *klee::klee_message_file = NULL;
+std::vector<unsigned>* klee::klee_warning_filter = NULL;
 
 static const char *warningPrefix = "WARNING";
 static const char *warningOncePrefix = "WARNING ONCE";
@@ -40,6 +41,17 @@ static bool shouldSetColor(const char *pfx, const char *msg,
   return false;
 }
 
+static unsigned long klee_cstrhash(const char *str)
+{
+  unsigned long hash = 5381;
+  int c;
+
+  while (c = *str++)
+      hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+  return hash;
+}
+
 static void klee_vfmessage(FILE *fp, const char *pfx, const char *msg,
                            va_list ap) {
   if (!fp)
@@ -47,6 +59,20 @@ static void klee_vfmessage(FILE *fp, const char *pfx, const char *msg,
 
   llvm::raw_fd_ostream fdos(fileno(fp), /*shouldClose=*/false,
                             /*unbuffered=*/true);
+
+  // JOR
+  unsigned hash = klee_cstrhash(msg)%0xffffff;
+  if(pfx && !strcmp(pfx, warningPrefix) && klee_warning_filter && !(std::find(klee_warning_filter->begin(), klee_warning_filter->end(), hash) != klee_warning_filter->end()))
+    return;
+
+  fdos.changeColor(llvm::raw_ostream::BLACK, false, true);
+  fdos.changeColor(llvm::raw_ostream::BLACK, false, false);
+  fdos << "[";
+  fdos.write_hex(klee_cstrhash(msg)%0xffffff);
+  fdos << "]";
+  fdos.resetColor();
+  fdos << " ";
+
   bool modifyConsoleColor = fdos.is_displayed() && (fp == stderr);
 
   if (modifyConsoleColor) {

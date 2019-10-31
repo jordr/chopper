@@ -96,6 +96,12 @@ namespace {
                    cl::desc("Comma-separated list of functions to be inlined (e.g. <function1>,<function2>,..)"),
                    cl::init(""));
 
+  // JOR
+  cl::opt<std::string>
+  WarningFilter("w",
+                cl::desc("filter out warnings"),
+                cl::init(""));
+
   cl::opt<unsigned int>
   MaxErrorCount("max-error-count",
                 cl::desc("max error count before exit"),
@@ -276,6 +282,9 @@ private:
   int m_argc;
   char **m_argv;
 
+  // JOR
+  std::vector<unsigned> m_warningfilter;
+
 public:
   KleeHandler(int argc, char **argv);
   ~KleeHandler();
@@ -310,6 +319,7 @@ public:
   }
 
   void setInterpreter(Interpreter *i);
+  void setWarningFilter(const std::vector<unsigned>& Warning);
 
   void processTestCase(const ExecutionState  &state,
                        const char *errorMessage,
@@ -1492,6 +1502,25 @@ int main(int argc, char **argv, char **envp) {
   if (!mainFn) {
     klee_error("'%s' function not found in module.", EntryPoint.c_str());
   }
+  
+  // JOR
+  std::vector<unsigned int> WarningFilterVector;
+  // parseSkippingParameter(mainModule, WarningFilter, WarningFilterVector, true);
+    std::istringstream stream(WarningFilter);
+    std::string token;
+    std::string fname;
+    while (std::getline(stream, token, ','))
+    {
+      std::vector<unsigned int> lines;
+      if (!parseNameLineOption(token, fname, lines)) {
+          klee_error("wfilter option: invalid parameter: %s", token.c_str());
+      }
+      unsigned int hash = std::stoul(fname, nullptr, 16);
+      WarningFilterVector.push_back(hash);
+      // klee_warning("Added warning filter %d", hash);
+    }
+  if(!WarningFilterVector.empty())
+    klee::klee_warning_filter = &WarningFilterVector;
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
   parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
@@ -1575,6 +1604,7 @@ int main(int argc, char **argv, char **envp) {
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);
   }
+
 
   char buf[256];
   time_t t[2];

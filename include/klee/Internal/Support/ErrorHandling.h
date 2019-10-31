@@ -17,11 +17,13 @@
 #endif
 
 #include <stdio.h>
+#include <vector> // JOR
 
 namespace klee {
 
 extern FILE *klee_warning_file;
 extern FILE *klee_message_file;
+extern std::vector<unsigned>* klee_warning_filter;
 
 /// Print "KLEE: ERROR: " followed by the msg in printf format and a
 /// newline on stderr and to warnings.txt, then exit with an error.
