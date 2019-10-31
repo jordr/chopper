@@ -130,7 +130,7 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
   vector<CallInst*> to_remove;
   for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
     if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
-      klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName());
+      // klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName());
       if (inst->getParent()->getParent() == wrapper) {
         continue;
       }
@@ -146,10 +146,13 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
         klee_warning("\treplaceCall to call, arg[0]=%s (%d args) by f=%s", 
-        //call->getNumArgOperands() ? call->getArgOperand(0)->getName() :
            "", call->getNumArgOperands(), f->getName().str().c_str());
-        replaceCall(call, f, wrapper);
-        to_remove.push_back(call);
+        if(replaceCall(call, f, wrapper) != 0) {
+          klee_warning("Failed to replace call to f=%s", f->getName().str().c_str());
+          // shouldn't we to report the error to the caller of replaceCalls? Probably, right?
+        }
+        else
+          to_remove.push_back(call);
       }
     }
   }
@@ -161,7 +164,8 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
 
 /// We replace a given CallInst to f with a new CallInst to __wrap_f
 /// If the original return value was used in a StoreInst, we use directly such variable, instead of creating a new one
-void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function *f, Function *wrapper) {
+/// JOR: now returns non-zero if failure
+int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function *f, Function *wrapper) {
   Value *allocaInst = NULL;
   StoreInst *prevStoreInst = NULL;
   bool hasPhiUse = false;
@@ -215,13 +219,29 @@ void klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Functio
     // }
   }
   klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands()); 
-  FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType()/* ->getNumParams() */);
+  FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType());
   const int wrapper_num_params = FTy->getNumParams();
-  klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType());
+  klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType()->getTypeID());
+  klee_warning("f.CONV:%d, wrapper.CONV:%d", f->getCallingConv(), wrapper->getCallingConv());
 
-  // assert(wrapper_num_params == origCallInst->getNumArgOperands()
-  //   || FTy->isVarArg() && origCallInst->getNumArgOperands() > wrapper_num_params);
-  
+  // JOR dodge LLVM assert....
+  llvm::ArrayRef<Value*> Args = makeArrayRef(argsForCall);
+  if(!(Args.size() == FTy->getNumParams() || (FTy->isVarArg() && Args.size() > FTy->getNumParams())))
+  {
+    // klee_error("Wrapper has bad signature! LLVM refuses to create call.");
+    klee_warning("\e[0;31mWrapper has bad signature! LLVM refuses to create call.\e[0;m");
+    return 1;
+  }
+  for (unsigned i = 0; i != Args.size(); ++i)
+  {
+    if(! (i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) )
+    {
+      klee_warning("\e[0;31mWrapper has bad signature! bad type of Args[%d].type=%d =/= wrapper.type=%d\
+        LLVM refuses to create call.\e[0;m", i, Args[i]->getType()->getTypeID(), FTy->getParamType(i)->getTypeID());
+      return 1;
+    }
+  }
+
   CallInst *callInst = builder.CreateCall(wrapper, makeArrayRef(argsForCall));
   callInst->setDebugLoc(origCallInst->getDebugLoc());
 
