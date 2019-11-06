@@ -24,8 +24,10 @@ def main(main_args):
 
     parser.add_argument('file', metavar='bcfile', help='.bc bytecode file to analyze')
     parser.add_argument('-f', '--noskip', help='Functions *not* to skip')
+    parser.add_argument('-s', '--skip', help='Functions to skip')
     parser.add_argument('-r', '--repo', help='Repository to get the diff from')
     parser.add_argument('-w', '--wfilter', help='Warnings to filter')
+    parser.add_argument('-i', help='Interactive mode', action='store_true')
     # from diffanalyze
     parser.add_argument('--revision', help='repository revision', default='HEAD')
     # parser.add_argument('-ri', '--rangeInt', type=int, metavar='N', help='look at patches for the previous N commits (preceding HASH)')
@@ -71,8 +73,10 @@ def main(main_args):
     os.system("opt -dot-callgraph " + args['file'] + " 1>/dev/null")
     print ("...\033[1;32m OK\033[0m")
     print ("Generating callgraph-chopped.dot...", end='', flush=True)
-    os.system("choppy-dot " + noskip)
+    os.system("choppy-dot " + noskip + " ./callgraph")
     print ("\033[1;32m OK\033[0m")
+    os.system("mv -v callgraph.dot callgraph-raw.dot")
+    os.system("mv -v callgraph-chopped.dot callgraph-raw-chopped.dot")
 
     # CHOPPER
     wfilter = ""
@@ -80,8 +84,17 @@ def main(main_args):
         wfilter = "-w=" + args['wfilter'] + " "
     klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -output-module -skip-functions-not=" + noskip + " " + wfilter + args['file']
     print("Running Chopper...\n" + colored(klee_command, 'yellow'))
+    if args['i']:
+        input("...")
 
     os.system(klee_command)
+
+    print ("Generating callgraph.dot...")
+    os.system("opt -dot-callgraph " + "./klee-last/final.bc" + " 1>/dev/null")
+    print ("...\033[1;32m OK\033[0m")
+    print ("Generating callgraph-chopped.dot...", end='', flush=True)
+    os.system("choppy-dot " + noskip + " ./callgraph")
+    print ("\033[1;32m OK\033[0m")
 
 if __name__ == '__main__':
     main(sys.argv[1:])
