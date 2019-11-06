@@ -467,11 +467,14 @@ const Module *Executor::setModule(llvm::Module *module,
     }
     for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
       // targets.push_back(i->name);
+      // TODO JOR: this is probably a problem
       klee_warning("NOT doing targets.push_back(%s);", i->name.c_str());
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
 
+    if (!interpreterOpts.NotskippedFunctions.empty())
+      klee_warning("\e[1;91mTarget list not built; Inliner, ModRefAnalysis and ReachabilityAnalysis will be run with empty targets");
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, targets, *logFile);
     inliner = new Inliner(module, ra, targets, interpreterOpts.inlinedFunctions, *logFile);
     aa = new AAPass();

@@ -29,10 +29,11 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  klee_warning("ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str());
+  klee_warning("BEGIN ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str());
   // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
     klee_warning("\tisVoid: %s", f.getName().str().c_str());
+    klee_warning("END ReturnToVoidFunctionPass");
     return false;
   }
   
@@ -55,7 +56,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
       replaceCalls(&f, wrapper, empty_lines);
       changed = true;
     }
-    klee_warning("End of ReturnToVoidFunctionPass");
+    klee_warning("END ReturnToVoidFunctionPass");
   }
   else
   {
@@ -266,6 +267,7 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
       }
     }
   }
+  return 0;
 }
 
 bool klee::ReturnToVoidFunctionPass::runOnModule(Module &module) {
