@@ -63,6 +63,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/User.h"
+#include <llvm/IR/ValueSymbolTable.h> // JOR: Chopper-not
 #else
 #include "llvm/Attributes.h"
 #include "llvm/BasicBlock.h"
@@ -472,11 +473,31 @@ const Module *Executor::setModule(llvm::Module *module,
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
-
     if (!interpreterOpts.NotskippedFunctions.empty())
       klee_warning("\e[1;91mTarget list not built; Inliner, ModRefAnalysis and ReachabilityAnalysis will be run with empty targets");
+
+    if (!interpreterOpts.NotskippedFunctions.empty()) {
+      klee_warning("Building target list of skipped functions...");
+      for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
+          // const llvm::StringMapEntry<llvm::Value*>
+          llvm::Value* v_fun = (*i).getValue();
+          const llvm::StringRef k_fun = (*i).getKey();
+          Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
+          if(!f)
+              continue;
+          bool skipped = true;
+          for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+            if(i->name == k_fun)
+              skipped = false;
+          }
+          klee::klee_warning(" - function in table: [%s] '%s'...", skipped ? "SKIPPED" : "KEPT   ", k_fun.str().c_str()); // hash 794780
+          if(skipped)
+            targets.push_back(k_fun);
+      }
+    }
+
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, targets, *logFile);
-    inliner = new Inliner(module, ra, targets, interpreterOpts.inlinedFunctions, *logFile);
+    inliner = new Inliner(module, ra, targets, interpreterOpts.inlinedFunctions, *logFile); // inlinedFunctions always empty?
     aa = new AAPass();
     aa->setPAType(PointerAnalysis::Andersen_WPA);
 
@@ -4829,8 +4850,8 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
           skipped = false;
       }
       if (skipped) {
-          Instruction *callInst = state.prevPC->inst;
-          const InstructionInfo &info = kmodule->infos->getInfo(callInst);
+          // Instruction *callInst = state.prevPC->inst;
+          // const InstructionInfo &info = kmodule->infos->getInfo(callInst);
           // const std::vector<unsigned int> &lines = option.lines;
 
           klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());

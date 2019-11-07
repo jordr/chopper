@@ -99,14 +99,14 @@ bool ReachabilityAnalysis::run(bool usePA) {
   }
   all.push_back(entryFunction);
 
-  for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
+  for (vector<string>::iterator i = m_targets.begin(); i != m_targets.end(); i++) {
     string name = *i;
     Function *f = module->getFunction(name);
     if (!f) {
       errs() << "function '" << name << "' is not found\n";
       return false;
     }
-    targetFunctions.push_back(f);
+    // targetFunctions.push_back(f); //JOR: this is useless??
     all.push_back(f);
   }
 

@@ -19,6 +19,7 @@ using namespace std;
 using namespace llvm;
 
 void Inliner::run() {
+    assert(functions.empty() && "JOR: We should always have functions.empty() for our use cases?");
     if (functions.empty()) {
         return;
     }

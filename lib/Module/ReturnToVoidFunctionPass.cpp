@@ -78,7 +78,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
 ///  2- calls f and stores the return value in __result
 Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Module &module) {
   // JOR
-  klee_message("\t createWrapperFunction(f=%s)", f.getName().str().c_str());
+  klee_warning("\t createWrapperFunction(f=%s)", f.getName().str().c_str());
 
   // create new function parameters: *return_var + original function's parameters
   vector<Type *> paramTypes;
@@ -150,6 +150,7 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
            "", call->getNumArgOperands(), f->getName().str().c_str());
         if(replaceCall(call, f, wrapper) != 0) {
           klee_warning("Failed to replace call to f=%s", f->getName().str().c_str());
+          // assert(false);
           // shouldn't we to report the error to the caller of replaceCalls? Probably, right?
         }
         else

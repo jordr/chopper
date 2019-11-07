@@ -53,6 +53,7 @@ void ModRefAnalysis::run() {
         errs() << "entry function '" << entry << "' is not found (or unreachable)\n";
         assert(false);
     }
+
     for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
         string name = *i;
         Function *f = module->getFunction(name);
