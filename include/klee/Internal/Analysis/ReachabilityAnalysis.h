@@ -25,7 +25,7 @@ public:
   ReachabilityAnalysis(llvm::Module *module, std::string entry,
                        std::vector<std::string> targets,
                        llvm::raw_ostream &debugs)
-      : module(module), entry(entry), targets(targets), entryFunction(NULL),
+      : module(module), entry(entry), m_targets(targets), entryFunction(NULL),
         aa(NULL), debugs(debugs) {}
 
   ~ReachabilityAnalysis() {};
@@ -73,9 +73,9 @@ private:
 
   llvm::Module *module;
   std::string entry;
-  std::vector<std::string> targets;
+  std::vector<std::string> m_targets;
   llvm::Function *entryFunction;
-  std::vector<llvm::Function *> targetFunctions;
+  // std::vector<llvm::Function *> targetFunctions;
   AAPass *aa;
   FunctionTypeMap functionTypeMap;
   ReachabilityMap reachabilityMap;
