@@ -484,7 +484,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
 
   /* Build shadow structures */
 
-  infos = new InstructionInfoTable(module, !NotskippedFunctions.empty() && !LegacyskippedFunctions.empty(), cloner);
+  infos = new InstructionInfoTable(module, !NotskippedFunctions.empty() || !LegacyskippedFunctions.empty(), cloner);
   
   for (Module::iterator it = module->begin(), ie = module->end();
        it != ie; ++it) {
@@ -496,7 +496,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     std::set<KFunction *> pool;
     pool.insert(new KFunction(f, this));
 
-    if (!NotskippedFunctions.empty() && !LegacyskippedFunctions.empty()) {
+    if (!NotskippedFunctions.empty() || !LegacyskippedFunctions.empty()) {
       Cloner::SliceMap *sliceMap = cloner->getSlices(f);
       if (sliceMap != 0) {
         for (Cloner::SliceMap::iterator s = sliceMap->begin(); s != sliceMap->end(); s++ ) {
@@ -514,7 +514,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     }
 
     for (std::set<KFunction *>::iterator kfi = pool.begin(); kfi != pool.end(); kfi++) {
-      addFunction(*kfi, !NotskippedFunctions.empty() && !LegacyskippedFunctions.empty(), cloner, mra);
+      addFunction(*kfi, !NotskippedFunctions.empty() || !LegacyskippedFunctions.empty(), cloner, mra);
     }
   }
 
