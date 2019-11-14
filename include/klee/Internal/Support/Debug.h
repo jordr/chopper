@@ -25,5 +25,6 @@
 #define KLEE_DEBUG(X) KLEE_DEBUG_WITH_TYPE(DEBUG_TYPE, X)
 
 #define DEBUG_BASIC "basic"
+#define DEBUG_SIGNATURES "signatures"
 
 #endif

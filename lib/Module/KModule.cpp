@@ -250,8 +250,8 @@ void KModule::addInternalFunction(const char* functionName){
 }
 
 void KModule::prepare(const Interpreter::ModuleOptions &opts,
-		              const std::vector<Interpreter::SkippedFunctionOption> &NotskippedFunctions,
-                  const std::vector<Interpreter::SkippedFunctionOption> &LegacyskippedFunctions,
+                      int skipMode,
+                      const std::vector<Interpreter::SkippedFunctionOption> &skippedFunctions,
                       InterpreterHandler *ih,
                       ReachabilityAnalysis *ra,
                       Inliner *inliner,
@@ -315,7 +315,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   // optimize is seeing what is as close as possible to the final
   // module.
   PassManager pm;
-  pm.add(new ReturnToVoidFunctionPass(NotskippedFunctions, LegacyskippedFunctions));
+  pm.add(new ReturnToVoidFunctionPass(skipMode, skippedFunctions));
   pm.add(new RaiseAsmPass());
   if (opts.CheckDivZero) pm.add(new DivCheckPass());
   if (opts.CheckOvershift) pm.add(new OvershiftCheckPass());
@@ -454,7 +454,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
 
   kleeMergeFn = module->getFunction("klee_merge");
 
-  if (!NotskippedFunctions.empty() || !LegacyskippedFunctions.empty()) {
+  if (skipMode) {
     /* prepare reachability analysis */
     ra->prepare();
 
@@ -484,7 +484,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
 
   /* Build shadow structures */
 
-  infos = new InstructionInfoTable(module, !NotskippedFunctions.empty() || !LegacyskippedFunctions.empty(), cloner);
+  infos = new InstructionInfoTable(module, skipMode, cloner);
   
   for (Module::iterator it = module->begin(), ie = module->end();
        it != ie; ++it) {
@@ -496,7 +496,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     std::set<KFunction *> pool;
     pool.insert(new KFunction(f, this));
 
-    if (!NotskippedFunctions.empty() || !LegacyskippedFunctions.empty()) {
+    if (skipMode) {
       Cloner::SliceMap *sliceMap = cloner->getSlices(f);
       if (sliceMap != 0) {
         for (Cloner::SliceMap::iterator s = sliceMap->begin(); s != sliceMap->end(); s++ ) {
@@ -514,7 +514,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     }
 
     for (std::set<KFunction *>::iterator kfi = pool.begin(); kfi != pool.end(); kfi++) {
-      addFunction(*kfi, !NotskippedFunctions.empty() || !LegacyskippedFunctions.empty(), cloner, mra);
+      addFunction(*kfi, skipMode, cloner, mra);
     }
   }
 

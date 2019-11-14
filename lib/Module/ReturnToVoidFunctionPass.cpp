@@ -9,6 +9,7 @@
 
 #include "Passes.h"
 
+#include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Constants.h"
@@ -29,39 +30,41 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  klee_warning("BEGIN ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str());
+  assert(skipMode);
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("BEGIN ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str()));
   // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
-    klee_warning("\tisVoid: %s", f.getName().str().c_str());
-    klee_warning("END ReturnToVoidFunctionPass");
+    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tisVoid: %s", f.getName().str().c_str()));
+    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
     return false;
   }
   
   bool changed = false;
   
-  if(!NotskippedFunctions.empty())
+  // JOR: TODO: fix this hack and include the SkipMode enum definition  
+  if(skipMode == 2)
   {
     bool isSkipped = true; //JOR
-    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = NotskippedFunctions.begin(); i != NotskippedFunctions.end(); i++) {
+    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
       if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
         isSkipped = false; 
-        klee_warning("\tNot voiding %s", i->name.c_str());
+        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tNot voiding %s", i->name.c_str()));
         break;
     }
       }
     if(isSkipped) {
-      klee_warning("\tVoiding %s", f.getName().str().c_str());
+      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tVoiding %s", f.getName().str().c_str()));
       Function *wrapper = createWrapperFunction(f, module);
       std::vector<unsigned int> empty_lines; // JOR hax
       replaceCalls(&f, wrapper, empty_lines);
       changed = true;
     }
-    klee_warning("END ReturnToVoidFunctionPass");
+    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
   }
   else
   {
     // legacy code
-    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = LegacyskippedFunctions.begin(); i != LegacyskippedFunctions.end(); i++) {
+    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
       if (string("__wrap_") + f.getName().str() == i->name) {
         Function *wrapper = createWrapperFunction(f, module);
         replaceCalls(&f, wrapper, i->lines);
@@ -78,7 +81,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
 ///  2- calls f and stores the return value in __result
 Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Module &module) {
   // JOR
-  klee_warning("\t createWrapperFunction(f=%s)", f.getName().str().c_str());
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t createWrapperFunction(f=%s)", f.getName().str().c_str()));
 
   // create new function parameters: *return_var + original function's parameters
   vector<Type *> paramTypes;
@@ -104,16 +107,12 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
     arg->setName(origArg->getName());
     argsForCall.push_back(arg);
   }
-  klee_warning("\t\t[createWrapperFunction] Set the arguments");
-  if(f.getName().str().c_str()[0] == 'p')
-  {
-    klee_warning("!!");
-  }
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Set the arguments"));
 
   // create basic block 'entry' in the new function
   BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
   IRBuilder<> builder(block);
-  klee_warning("\t\t[createWrapperFunction] Create BB entry");
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Create BB entry"));
 
   // insert call to the original function
   Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
@@ -131,7 +130,7 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
   vector<CallInst*> to_remove;
   for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
     if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
-      // klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName());
+      // DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName()));
       if (inst->getParent()->getParent() == wrapper) {
         continue;
       }
@@ -146,10 +145,10 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
-        klee_warning("\treplaceCall to call, arg[0]=%s (%d args) by f=%s", 
-           "", call->getNumArgOperands(), f->getName().str().c_str());
+        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\treplaceCall to call, arg[0]=%s (%d args) by f=%s",
+           "", call->getNumArgOperands(), f->getName().str().c_str()));
         if(replaceCall(call, f, wrapper) != 0) {
-          klee_warning("Failed to replace call to f=%s", f->getName().str().c_str());
+          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("Failed to replace call to f=%s", f->getName().str().c_str()));
           // assert(false);
           // shouldn't we to report the error to the caller of replaceCalls? Probably, right?
         }
@@ -158,7 +157,7 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
     }
   }
-  klee_warning("end");
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("end"));
   for (auto ci = to_remove.begin(), ce = to_remove.end(); ci != ce; ci++) {
     (*ci)->eraseFromParent();
   }
@@ -211,7 +210,7 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
     ss << *origCallInst->getArgOperand(i);
     ss << "(TYPE=" << *origCallInst->getArgOperand(i)->getType() << ")";
     ss << "(TID=" << (origCallInst->getArgOperand(i)->getType()->getTypeID()) << ")";
-    klee_warning("\t- originalCall.argoperand[%d] = %s", i, ss.str().c_str());
+    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t- originalCall.argoperand[%d] = %s", i, ss.str().c_str()));
   
     // JOR hax
     // if(origCallInst->getArgOperand(i)->getType()->getTypeID() == Type::TypeID::PointerTyID)
@@ -220,25 +219,26 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
     //   return;
     // }
   }
-  klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands()); 
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands())); 
   FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType());
   const int wrapper_num_params = FTy->getNumParams();
-  klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType()->getTypeID());
-  klee_warning("f.CONV:%d, wrapper.CONV:%d", f->getCallingConv(), wrapper->getCallingConv());
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType()->getTypeID()));
+  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("f.CONV:%d, wrapper.CONV:%d", f->getCallingConv(), wrapper->getCallingConv()));
 
   // JOR dodge LLVM assert....
   llvm::ArrayRef<Value*> Args = makeArrayRef(argsForCall);
   if(!(Args.size() == FTy->getNumParams() || (FTy->isVarArg() && Args.size() > FTy->getNumParams())))
   {
     // klee_error("Wrapper has bad signature! LLVM refuses to create call.");
-    klee_warning("\e[0;31mWrapper has bad signature! LLVM refuses to create call.\e[0;m");
+    klee_warning("\e[1;35mWrapper has bad signature! LLVM refuses to create call. Args.size()=%d, FTy->getNumParams()=%d, FTY->isVarArg()=%d",
+      Args.size(), FTy->getNumParams(), (FTy->isVarArg()));
     return 1;
   }
   for (unsigned i = 0; i != Args.size(); ++i)
   {
     if(! (i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) )
     {
-      klee_warning("\e[0;31mWrapper has bad signature! bad type of Args[%d].type=%d =/= wrapper.type=%d\
+      klee_warning("\e[1;35mWrapper has bad signature! bad type of Args[%d].type=%d =/= wrapper.type=%d\
         LLVM refuses to create call.\e[0;m", i, Args[i]->getType()->getTypeID(), FTy->getParamType(i)->getTypeID());
       return 1;
     }

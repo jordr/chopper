@@ -437,6 +437,15 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   mra = NULL;
   cloner = NULL;
   sliceGenerator = NULL;
+
+  // set skip mode
+  assert(interpreterOpts.NotskippedFunctions.empty() || interpreterOpts.LegacyskippedFunctions.empty());
+  if (!interpreterOpts.NotskippedFunctions.empty())
+    skipMode = CHOP_KEEP;
+  else if(!interpreterOpts.LegacyskippedFunctions.empty())
+    skipMode = CHOP_LEGACY;
+  else
+    skipMode = CHOP_NONE;
 }
 
 
@@ -459,40 +468,78 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler->prepare();
 
   // JOR TODO: try disabling the whole thing or parts thereof for notskipped functions maybe?
-  if (!interpreterOpts.NotskippedFunctions.empty() || !interpreterOpts.LegacyskippedFunctions.empty()) {
+  if (skipMode != CHOP_NONE) {
     /* build target functions */
     std::vector<std::string> targets;
     for (auto i = interpreterOpts.LegacyskippedFunctions.begin(), e = interpreterOpts.LegacyskippedFunctions.end(); i != e; i++) {
       targets.push_back(i->name);
-      klee_warning("targets.push_back(%s);", i->name.c_str());
-    }
-    for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
-      // targets.push_back(i->name);
-      // TODO JOR: this is probably a problem
-      klee_warning("NOT doing targets.push_back(%s);", i->name.c_str());
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
-    if (!interpreterOpts.NotskippedFunctions.empty())
-      klee_warning("\e[1;91mTarget list not built; Inliner, ModRefAnalysis and ReachabilityAnalysis will be run with empty targets");
 
-    if (!interpreterOpts.NotskippedFunctions.empty()) {
+    if (skipMode == CHOP_KEEP) {
       klee_warning("Building target list of skipped functions...");
       for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
-          // const llvm::StringMapEntry<llvm::Value*>
-          llvm::Value* v_fun = (*i).getValue();
-          const llvm::StringRef k_fun = (*i).getKey();
-          Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
-          if(!f)
-              continue;
-          bool skipped = true;
-          for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
-            if(i->name == k_fun)
-              skipped = false;
+        // const llvm::StringMapEntry<llvm::Value*>
+        llvm::Value* v_fun = (*i).getValue();
+        const llvm::StringRef k_fun = (*i).getKey();
+        Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
+        if(!f)
+            continue;
+
+        int kept = 0; // 1 = automatic, 2 = manual
+        std::string str = "";
+        if(f->isIntrinsic())
+        {
+          kept = 1;
+          str = " (Intrinsic)";
+        }
+        else if(f->hasHiddenVisibility())
+        {
+          kept = 1;
+          str = " (Hidden visibility)";
+        }
+        else if(f->getName().startswith("__uClibc"))
+        {
+          kept = 1;
+          str = " (uClibc)";
+        }
+        else for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+          if(i->name == k_fun)
+          {
+            kept = 2;
+            str = " (Selected)";
           }
-          klee::klee_warning(" - function in table: [%s] '%s'...", skipped ? "SKIPPED" : "KEPT   ", k_fun.str().c_str()); // hash 794780
-          if(skipped)
-            targets.push_back(k_fun);
+        }
+
+        if(!kept && f->hasWeakLinkage())
+        {
+          klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
+          kept = 1;
+          str = " (Weak linkage)";
+        }
+        if(!kept && f->hasInternalLinkage())
+        {
+          klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
+          kept = 1;
+          str = " (Internal linkage)";
+        }
+        if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
+        {
+          kept = 1;
+          klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
+        }
+
+        klee::klee_message("%s '%s'...%s", 
+          (kept == 1 ? "[AUTOKEEP]\e[0;32m" : (!kept ? "[SKIP    ]\e[0;31m" : "[KEEP    ]\e[0;92m")),
+        k_fun.str().c_str(), str.c_str());
+        if(!kept)
+          targets.push_back(k_fun);
+        else if(kept == 1) // autokeep: we have to add it to the skippedfunctions vectors
+        {
+          std::vector<unsigned int> empty_lines;
+          interpreterOpts.NotskippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
+        }
       }
     }
 
@@ -508,7 +555,8 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
-  kmodule->prepare(opts, interpreterOpts.NotskippedFunctions, interpreterOpts.LegacyskippedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  kmodule->prepare(opts, skipMode, skipMode == CHOP_KEEP ? interpreterOpts.NotskippedFunctions : interpreterOpts.LegacyskippedFunctions, 
+    interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -4830,7 +4878,7 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // check NotskippedFunctions
-    if(!interpreterOpts.NotskippedFunctions.empty())
+    if(skipMode == CHOP_KEEP)
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?
@@ -4843,12 +4891,12 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
             skipped = false;
             break;
           }
-      }
+      }/* 
       if(f->getName().str().find("__uClibc") == 0) // JOR: hax
       {
           klee_warning("Not skipping uclibc function");
           skipped = false;
-      }
+      } */
       if (skipped) {
           // Instruction *callInst = state.prevPC->inst;
           // const InstructionInfo &info = kmodule->infos->getInfo(callInst);
