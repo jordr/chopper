@@ -437,15 +437,6 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   mra = NULL;
   cloner = NULL;
   sliceGenerator = NULL;
-
-  // set skip mode
-  assert(interpreterOpts.NotskippedFunctions.empty() || interpreterOpts.LegacyskippedFunctions.empty());
-  if (!interpreterOpts.NotskippedFunctions.empty())
-    skipMode = CHOP_KEEP;
-  else if(!interpreterOpts.LegacyskippedFunctions.empty())
-    skipMode = CHOP_LEGACY;
-  else
-    skipMode = CHOP_NONE;
 }
 
 
@@ -468,19 +459,21 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler->prepare();
 
   // JOR TODO: try disabling the whole thing or parts thereof for notskipped functions maybe?
-  if (skipMode != CHOP_NONE) {
+  if (interpreterOpts.skipMode != CHOP_NONE) {
     /* build target functions */
     std::vector<std::string> targets;
-    for (auto i = interpreterOpts.LegacyskippedFunctions.begin(), e = interpreterOpts.LegacyskippedFunctions.end(); i != e; i++) {
-      targets.push_back(i->name);
+    
+    if (interpreterOpts.skipMode == Interpreter::CHOP_LEGACY) {
+      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
+        targets.push_back(i->name);
+      }
     }
 
     logFile = interpreterHandler->openOutputFile("sa.log");
 
-    if (skipMode == CHOP_KEEP) {
+    if (interpreterOpts.skipMode == Interpreter::CHOP_KEEP) {
       klee_warning("Building target list of skipped functions...");
       for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
-        // const llvm::StringMapEntry<llvm::Value*>
         llvm::Value* v_fun = (*i).getValue();
         const llvm::StringRef k_fun = (*i).getKey();
         Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
@@ -504,7 +497,7 @@ const Module *Executor::setModule(llvm::Module *module,
           kept = 1;
           str = " (uClibc)";
         }
-        else for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+        else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
           if(i->name == k_fun)
           {
             kept = 2;
@@ -538,7 +531,7 @@ const Module *Executor::setModule(llvm::Module *module,
         else if(kept == 1) // autokeep: we have to add it to the skippedfunctions vectors
         {
           std::vector<unsigned int> empty_lines;
-          interpreterOpts.NotskippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
+          interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
         }
       }
     }
@@ -555,8 +548,7 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
-  kmodule->prepare(opts, skipMode, skipMode == CHOP_KEEP ? interpreterOpts.NotskippedFunctions : interpreterOpts.LegacyskippedFunctions, 
-    interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  kmodule->prepare(opts, interpreterOpts.skipMode, interpreterOpts.skippedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -4878,12 +4870,12 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // check NotskippedFunctions
-    if(skipMode == CHOP_KEEP)
+    if(interpreterOpts.skipMode == CHOP_KEEP)
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?
       klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str());
-      for (auto i = interpreterOpts.NotskippedFunctions.begin(), e = interpreterOpts.NotskippedFunctions.end(); i != e; i++) {
+      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
           const SkippedFunctionOption &option = *i;
           klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
           if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
@@ -4923,8 +4915,9 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
       klee_message("                          ...NO");
     }
     // legacy code - check LegacyskippedFunctions
+    else if(interpreterOpts.skipMode == CHOP_LEGACY)
     {
-      for (auto i = interpreterOpts.LegacyskippedFunctions.begin(), e = interpreterOpts.LegacyskippedFunctions.end(); i != e; i++) {
+      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
         if ((option.name == f->getName().str())) {
             Instruction *callInst = state.prevPC->inst;

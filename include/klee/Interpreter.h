@@ -76,6 +76,12 @@ public:
 	  SMTLIB2 //.SMT2 files (SMTLIB version 2 files)
   };
 
+  enum SkipMode {
+    CHOP_NONE=0, // don't skip anything
+    CHOP_LEGACY, // select functions to skip
+    CHOP_KEEP, // select functions *not* to skip
+  };
+
   struct SkippedFunctionOption {
     std::string name;
     /* TODO: change to lines? */
@@ -106,8 +112,10 @@ public:
     typedef std::map<std::string, std::vector<unsigned> > ErrorLocations;
 
     unsigned MakeConcreteSymbolic;
-    std::vector<SkippedFunctionOption> NotskippedFunctions;
-    std::vector<SkippedFunctionOption> LegacyskippedFunctions;
+    /* @brief Chopper: selected skip mode */
+    SkipMode skipMode;
+    /* @brief Chopper: Functions to be skipped, regardless of the skipMode */
+    std::vector<SkippedFunctionOption> skippedFunctions;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;

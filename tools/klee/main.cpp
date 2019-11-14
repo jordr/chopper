@@ -1523,11 +1523,18 @@ int main(int argc, char **argv, char **envp) {
     klee::klee_warning_filter = &WarningFilterVector;
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
-  parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
+  Interpreter::SkipMode skipMode;
+  parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
   parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy, true);
   if(!skippingOptionsNot.empty() && !skippingOptionsLegacy.empty())
     klee_error("Cannot specify both --skip-functions-legacy and --skip-functions-not.");
+  else if(!skippingOptionsLegacy.empty())
+    skipMode = Interpreter::CHOP_LEGACY;
+  else if(!skippingOptionsNot.empty())
+    skipMode = Interpreter::CHOP_KEEP;
+  else
+    skipMode = Interpreter::CHOP_NONE;
 
   std::vector<std::string> inlinedFunctions;
   parseInlinedFunctions(mainModule, InlinedFunctions, inlinedFunctions);
@@ -1582,8 +1589,8 @@ int main(int argc, char **argv, char **envp) {
 
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
-  IOpts.NotskippedFunctions = skippingOptionsNot;
-  IOpts.LegacyskippedFunctions = skippingOptionsLegacy;
+  IOpts.skipMode = skipMode;
+  IOpts.skippedFunctions = skipMode == Interpreter::CHOP_KEEP ? skippingOptionsNot : skippingOptionsLegacy;
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
@@ -1764,7 +1771,9 @@ int main(int argc, char **argv, char **envp) {
         << handler->getNumTestCases() << "\n";
 
   /* these are relevant only when we have a slicing option */
-  if (!IOpts.NotskippedFunctions.empty() || !IOpts.LegacyskippedFunctions.empty()) {
+  if (IOpts.skipMode) {
+    stats << "KLEE: done: skipped functions = "
+          << IOpts.skippedFunctions.size() << "\n";
     stats << "KLEE: done: recovery states = "
           << handler->getRecoveryStatesCount() << "\n";
     stats << "KLEE: done: generated slices = "

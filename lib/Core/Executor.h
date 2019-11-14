@@ -122,12 +122,6 @@ public:
     Unhandled
   };
 
-  enum SkipMode {
-    CHOP_NONE=0,
-    CHOP_LEGACY,
-    CHOP_KEEP,
-  };
-
 private:
   static const char *TerminateReasonNames[];
 
@@ -231,14 +225,6 @@ private:
   ModRefAnalysis *mra;
   Cloner *cloner;
   SliceGenerator *sliceGenerator;
-
-  /* @brief Chopper: selected skip mode */
-  SkipMode skipMode;
-
-  /* @brief Chopper: Functions to be skipped, regardless of the skipMode */
-  // std::vector<std::string> skippedFunctions;
-  // JOR: TODO: merge legacyskippedfunctions and notskippedfunctions
-
 
   unsigned int errorCount;
 

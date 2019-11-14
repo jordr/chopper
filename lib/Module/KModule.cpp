@@ -250,7 +250,7 @@ void KModule::addInternalFunction(const char* functionName){
 }
 
 void KModule::prepare(const Interpreter::ModuleOptions &opts,
-                      int skipMode,
+                      Interpreter::SkipMode skipMode,
                       const std::vector<Interpreter::SkippedFunctionOption> &skippedFunctions,
                       InterpreterHandler *ih,
                       ReachabilityAnalysis *ra,
