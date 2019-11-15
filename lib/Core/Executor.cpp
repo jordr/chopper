@@ -93,6 +93,9 @@
 #include "llvm/IR/CallSite.h"
 #endif
 
+// JOR:
+#include "llvm/DebugInfo.h"
+
 #include "llvm/PassManager.h"
 
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
@@ -481,54 +484,68 @@ const Module *Executor::setModule(llvm::Module *module,
             continue;
 
         int kept = 0; // 1 = automatic, 2 = manual
-        std::string str = "";
+        std::string reasonStr = "";
         if(f->isIntrinsic())
         {
           kept = 1;
-          str = " (Intrinsic)";
+          reasonStr = " (Intrinsic)";
         }
         else if(f->hasHiddenVisibility())
         {
           kept = 1;
-          str = " (Hidden visibility)";
+          reasonStr = " (Hidden visibility)";
         }
-        // else if(f->getName().startswith("__uClibc"))
-        // {
-        //   kept = 1;
-        //   str = " (uClibc)";
-        // }
         else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
           if(i->name == k_fun)
           {
             kept = 2;
-            str = " (Selected)";
+            reasonStr = " (Selected)";
+          }
+        }
+        
+        llvm::StringRef filename;
+        { // JOR: getting the filename
+          DebugInfoFinder Finder;
+          Finder.processModule(*f->getParent());
+          for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
+            const MDNode* node = *Iter;
+            DISubprogram SP(node);
+            if (SP.describes(f)) {
+              filename = SP.getFilename();
+              break;
+            }
           }
         }
 
-        if(!kept && f->hasWeakLinkage())
+        // if(!kept && f->hasWeakLinkage())
+        // {
+        //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
+        //   kept = 1;
+        //   str = " (Weak linkage)";
+        // }
+        if(!kept && filename.startswith(StringRef("libc/")))
         {
-          klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
+          // klee_warning("Autokeeping libc function: %s", k_fun.str().c_str());
           kept = 1;
-          str = " (Weak linkage)";
+          reasonStr = " (libc)";
         }
-        if(!kept && f->hasInternalLinkage())
+        else if(!kept && f->hasInternalLinkage())
         {
           klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
           kept = 1;
-          str = " (Internal linkage)";
+          reasonStr = " (Internal linkage)";
         }
-        if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
+        else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
         {
-          kept = 1;
           klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
         }
 
-        klee::klee_message("%s '%s'...%s", 
-          (kept == 1 ? "[AUTOKEEP]\e[0;32m" : (!kept ? "[SKIP    ]\e[0;31m" : "[KEEP    ]\e[0;92m")),
-        k_fun.str().c_str(), str.c_str());
+        klee::klee_message("%s '%s'...%s (%s)", 
+          (kept == 1 ? "|AUTOKEEP|\e[0;32m" : (!kept ? "|SKIP    |\e[0;31m" : "|KEEP    |\e[0;92m")),
+          k_fun.str().c_str(), reasonStr.c_str(), filename.str().c_str());
         if(!kept)
           targets.push_back(k_fun);
-        else if(kept == 1) // autokeep: we have to add it to the skippedfunctions vectors
+        else if(kept == 1) // autokeep: we have to add it to the skippedFunctions vectors
         {
           std::vector<unsigned int> empty_lines;
           interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
