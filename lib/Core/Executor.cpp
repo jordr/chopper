@@ -492,11 +492,11 @@ const Module *Executor::setModule(llvm::Module *module,
           kept = 1;
           str = " (Hidden visibility)";
         }
-        else if(f->getName().startswith("__uClibc"))
-        {
-          kept = 1;
-          str = " (uClibc)";
-        }
+        // else if(f->getName().startswith("__uClibc"))
+        // {
+        //   kept = 1;
+        //   str = " (uClibc)";
+        // }
         else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
           if(i->name == k_fun)
           {
@@ -2055,7 +2055,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     if (f) {
       // JOR: debugging
-      klee_warning("\tCALLING function: %s", f->getName().str().c_str());
+      klee_message("CALLING '\e[0;96m%s\e[0;m'", f->getName().str().c_str());
 
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
@@ -4874,12 +4874,11 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?
-      klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str());
+      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str()));
       for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
           const SkippedFunctionOption &option = *i;
-          klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
-          if ((option.name == "__wrap_" + f->getName().str()) || (option.name == "" + f->getName().str())) { // JOR: hack-ish
-            // JOR TODO: do not skip non wrappers, that's dangerous? I think the problem is on the wrapper generation
+          // klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
+          if (option.name == "" + f->getName().str()) {
             skipped = false;
             break;
           }
@@ -4894,10 +4893,10 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
           // const InstructionInfo &info = kmodule->infos->getInfo(callInst);
           // const std::vector<unsigned int> &lines = option.lines;
 
-          klee_warning("\t\tskipping all calls to: %s", f->getName().str().data());
+          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\tskipping all calls to: %s", f->getName().str().data()));
           /* skip any call site */
           // if (lines.empty()) {
-          klee_message("                          ...YES");
+          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("                          ...YES"));
           return true;
           // }
   #if 0
@@ -4912,7 +4911,7 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
   #endif
         }
 
-      klee_message("                          ...NO");
+      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("                          ...NO"));
     }
     // legacy code - check LegacyskippedFunctions
     else if(interpreterOpts.skipMode == CHOP_LEGACY)

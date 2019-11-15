@@ -35,6 +35,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
     DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tisVoid: %s", f.getName().str().c_str()));
+    DEBUG_WITH_TYPE("temp1", klee_warning("\tisVoid: %s", f.getName().str().c_str()));
     DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
     return false;
   }
@@ -49,6 +50,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
       if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
         isSkipped = false; 
         DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tNot voiding %s", i->name.c_str()));
+        DEBUG_WITH_TYPE("temp1", klee_warning("\tNot voiding %s", i->name.c_str()));
         break;
     }
       }
@@ -128,6 +130,7 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
 /// The replacement will occur at all call sites only if the user has not specified a given line in the '-skip-functions' options
 void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper, const vector<unsigned int> &lines) {
   vector<CallInst*> to_remove;
+  DEBUG_WITH_TYPE("temp1", klee_warning("Creating wrap for '%s'", f->getName().str().c_str()));
   for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
     if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
       // DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName()));

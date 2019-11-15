@@ -1772,7 +1772,7 @@ int main(int argc, char **argv, char **envp) {
 
   /* these are relevant only when we have a slicing option */
   if (IOpts.skipMode) {
-    stats << "KLEE: done: skipped functions = "
+    stats << "KLEE: done: " << (IOpts.skipMode == Interpreter::CHOP_KEEP ? "kept" : "skipped") << " functions = "
           << IOpts.skippedFunctions.size() << "\n";
     stats << "KLEE: done: recovery states = "
           << handler->getRecoveryStatesCount() << "\n";
