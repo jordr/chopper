@@ -64,7 +64,11 @@ static volatile unsigned timerTicks = 0;
 
 // XXX hack
 extern "C" unsigned dumpStates, dumpPTree;
-unsigned dumpStates = 0, dumpPTree = 0;
+#define DUMP_PTREE_VAL 0
+#ifdef DUMP_PTREE
+  #define DUMP_PTREE_VAL 1
+#endif
+unsigned dumpStates = 0, dumpPTree = DUMP_PTREE_VAL;
 
 static void onAlarm(int) {
   ++timerTicks;
