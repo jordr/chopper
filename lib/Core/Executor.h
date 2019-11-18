@@ -230,6 +230,9 @@ private:
 
   llvm::raw_ostream *logFile;
 
+  void getSkippedFunctions(std::vector<std::string>& targets, llvm::Module *module, 
+                            const ModuleOptions &opts);
+
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
   

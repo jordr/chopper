@@ -442,7 +442,6 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   sliceGenerator = NULL;
 }
 
-
 const Module *Executor::setModule(llvm::Module *module, 
                                   const ModuleOptions &opts) {
   assert(!kmodule && module && "can only register one module"); // XXX gross
@@ -465,93 +464,7 @@ const Module *Executor::setModule(llvm::Module *module,
   if (interpreterOpts.skipMode != CHOP_NONE) {
     /* build target functions */
     std::vector<std::string> targets;
-    
-    if (interpreterOpts.skipMode == Interpreter::CHOP_LEGACY) {
-      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-        targets.push_back(i->name);
-      }
-    }
-
-    logFile = interpreterHandler->openOutputFile("sa.log");
-
-    if (interpreterOpts.skipMode == Interpreter::CHOP_KEEP) {
-      klee_warning("Building target list of skipped functions...");
-      for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
-        llvm::Value* v_fun = (*i).getValue();
-        const llvm::StringRef k_fun = (*i).getKey();
-        Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
-        if(!f)
-            continue;
-
-        int kept = 0; // 1 = automatic, 2 = manual
-        std::string reasonStr = "";
-        if(f->isIntrinsic())
-        {
-          kept = 1;
-          reasonStr = " (Intrinsic)";
-        }
-        else if(f->hasHiddenVisibility())
-        {
-          kept = 1;
-          reasonStr = " (Hidden visibility)";
-        }
-        else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-          if(i->name == k_fun)
-          {
-            kept = 2;
-            reasonStr = " (Selected)";
-          }
-        }
-        
-        llvm::StringRef filename;
-        { // JOR: getting the filename
-          DebugInfoFinder Finder;
-          Finder.processModule(*f->getParent());
-          for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
-            const MDNode* node = *Iter;
-            DISubprogram SP(node);
-            if (SP.describes(f)) {
-              filename = SP.getFilename();
-              break;
-            }
-          }
-        }
-
-        // if(!kept && f->hasWeakLinkage())
-        // {
-        //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
-        //   kept = 1;
-        //   str = " (Weak linkage)";
-        // }
-        if(!kept && filename.startswith(StringRef("libc/")))
-        {
-          // klee_warning("Autokeeping libc function: %s", k_fun.str().c_str());
-          kept = 1;
-          reasonStr = " (libc)";
-        }
-        else if(!kept && f->hasInternalLinkage())
-        {
-          klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
-          kept = 1;
-          reasonStr = " (Internal linkage)";
-        }
-        else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
-        {
-          klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
-        }
-
-        klee::klee_message("%s '%s'...%s (%s)", 
-          (kept == 1 ? "|AUTOKEEP|\e[0;32m" : (!kept ? "|SKIP    |\e[0;31m" : "|KEEP    |\e[0;92m")),
-          k_fun.str().c_str(), reasonStr.c_str(), filename.str().c_str());
-        if(!kept)
-          targets.push_back(k_fun);
-        else if(kept == 1) // autokeep: we have to add it to the skippedFunctions vectors
-        {
-          std::vector<unsigned int> empty_lines;
-          interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
-        }
-      }
-    }
+    getSkippedFunctions(targets, module, opts);
 
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, targets, *logFile);
     inliner = new Inliner(module, ra, targets, interpreterOpts.inlinedFunctions, *logFile); // inlinedFunctions always empty?
@@ -1721,6 +1634,97 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
     debugFile << "     " << ii.file << ":" << ii.line << ":";
   else
     debugFile << "     [no debug info]:";
+}
+
+// JOR:
+void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Module *module, const ModuleOptions &opts)
+{
+  if (interpreterOpts.skipMode == Interpreter::CHOP_LEGACY) {
+    for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
+      targets.push_back(i->name);
+    }
+  }
+
+  logFile = interpreterHandler->openOutputFile("sa.log");
+
+  if (interpreterOpts.skipMode == Interpreter::CHOP_KEEP) {
+    klee_warning("Building target list of skipped functions...");
+    for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
+      llvm::Value* v_fun = (*i).getValue();
+      const llvm::StringRef k_fun = (*i).getKey();
+      Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
+      if(!f)
+          continue;
+
+      int kept = 0; // 1 = automatic, 2 = manual
+      std::string reasonStr = "";
+      if(f->isIntrinsic())
+      {
+        kept = 1;
+        reasonStr = " (Intrinsic)";
+      }
+      else if(f->hasHiddenVisibility())
+      {
+        kept = 1;
+        reasonStr = " (Hidden visibility)";
+      }
+      else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
+        if(i->name == k_fun)
+        {
+          kept = 2;
+          reasonStr = " (Selected)";
+        }
+      }
+      
+      llvm::StringRef filename;
+      { // JOR: getting the filename
+        DebugInfoFinder Finder;
+        Finder.processModule(*f->getParent());
+        for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
+          const MDNode* node = *Iter;
+          DISubprogram SP(node);
+          if (SP.describes(f)) {
+            filename = SP.getFilename();
+            break;
+          }
+        }
+      }
+
+      // if(!kept && f->hasWeakLinkage())
+      // {
+      //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
+      //   kept = 1;
+      //   str = " (Weak linkage)";
+      // }
+      if(!kept && filename.startswith(StringRef("libc/")))
+      {
+        // klee_warning("Autokeeping libc function: %s", k_fun.str().c_str());
+        kept = 1;
+        reasonStr = " (libc)";
+      }
+      else if(!kept && f->hasInternalLinkage())
+      {
+        klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
+        kept = 1;
+        reasonStr = " (Internal linkage)";
+      }
+      else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
+      {
+        klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
+      }
+
+      klee::klee_message("%s '%s'...%s (%s)", 
+        (kept == 1 ? "|AUTOKEEP|\e[0;32m" : (!kept ? "|SKIP    |\e[0;31m" : "|KEEP    |\e[0;92m")),
+        k_fun.str().c_str(), reasonStr.c_str(), filename.str().c_str());
+      if(!kept)
+        targets.push_back(k_fun);
+      else if(kept == 1) // autokeep: we have to add it to the skippedFunctions vectors
+      {
+        std::vector<unsigned int> empty_lines;
+        interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
+      }
+    }
+  }
 }
 
 /// Compute the true target of a function call, resolving LLVM and KLEE aliases
