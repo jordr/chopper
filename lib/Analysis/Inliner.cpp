@@ -14,19 +14,25 @@
 
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
 #include "klee/Internal/Analysis/Inliner.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 
 using namespace std;
 using namespace llvm;
 
 void Inliner::run() {
-    assert(functions.empty() && "JOR: We should always have functions.empty() for our use cases?");
+    // JOR: It seems we only get !functions.empty() when -inline= is used
     if (functions.empty()) {
+        klee::klee_message("Inliner: nothing to do.");
         return;
     }
 
     for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
         Function *entry = module->getFunction(*i);
-        assert(entry);
+        if(!entry)
+        {
+            klee::klee_warning("Inliner: not looking for calls from '%s': does not exist or unreachable", (*i).c_str());
+            continue;
+        }
 
         /* we can't use pointer analysis at this point... */
         set<Function *> reachable;

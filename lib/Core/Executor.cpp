@@ -463,15 +463,15 @@ const Module *Executor::setModule(llvm::Module *module,
   // JOR TODO: try disabling the whole thing or parts thereof for notskipped functions maybe?
   if (interpreterOpts.skipMode != CHOP_NONE) {
     /* build target functions */
-    std::vector<std::string> targets;
-    getSkippedFunctions(targets, module, opts);
+    std::vector<std::string> skippedTargets;
+    getSkippedFunctions(skippedTargets, module, opts);
 
-    ra = new ReachabilityAnalysis(module, opts.EntryPoint, targets, *logFile);
-    inliner = new Inliner(module, ra, targets, interpreterOpts.inlinedFunctions, *logFile); // inlinedFunctions always empty?
+    ra = new ReachabilityAnalysis(module, opts.EntryPoint, skippedTargets, *logFile);
+    inliner = new Inliner(module, ra, skippedTargets, interpreterOpts.inlinedFunctions, *logFile); // doesn't do anything except if -inline=f is specified
     aa = new AAPass();
     aa->setPAType(PointerAnalysis::Andersen_WPA);
 
-    mra = new ModRefAnalysis(kmodule->module, ra, aa, opts.EntryPoint, targets, *logFile);
+    mra = new ModRefAnalysis(kmodule->module, ra, aa, opts.EntryPoint, skippedTargets, *logFile);
     cloner = new Cloner(module, ra, *logFile);
     if (UseSlicer) {
       sliceGenerator = new SliceGenerator(module, ra, aa, mra, cloner, *logFile, LazySlicing);
@@ -1702,12 +1702,12 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
         kept = 1;
         reasonStr = " (libc)";
       }
-      else if(!kept && f->hasInternalLinkage())
-      {
-        klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
-        kept = 1;
-        reasonStr = " (Internal linkage)";
-      }
+      // else if(!kept && f->hasInternalLinkage())
+      // {
+      //   klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
+      //   kept = 1;
+      //   reasonStr = " (Internal linkage)";
+      // }
       else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
       {
         klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());

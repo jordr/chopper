@@ -30,7 +30,7 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  assert(skipMode);
+  // assert(skipMode);
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("BEGIN ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str()));
   // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
@@ -63,7 +63,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
     }
     DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
   }
-  else
+  else if(skipMode == 1)
   {
     // legacy code
     for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {

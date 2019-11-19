@@ -19,6 +19,7 @@
 
 #include "klee/Internal/Analysis/AAPass.h"
 #include "klee/Internal/Analysis/ModRefAnalysis.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 
 using namespace std;
 using namespace llvm;
@@ -54,14 +55,22 @@ void ModRefAnalysis::run() {
         assert(false);
     }
 
+    vector<vector<string>::iterator> todel;
     for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
         string name = *i;
         Function *f = module->getFunction(name);
         if (!f) {
-            errs() << "function '" << name << "' is not found (or unreachable)\n";
-            assert(false);
+            // errs() << "function '" << name << "' is not found (or unreachable)\n";
+            klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
+            // assert(false);
+            // targets.erase(i);
+            todel.push_back(i);
+            continue; // JOR: TODO: ensure safety
         }
         targetFunctions.push_back(f);
+    }
+    for (vector<vector<string>::iterator>::iterator d = todel.begin(); d != todel.end(); d++) {
+        targets.erase(*d); // JOR: this doesn't seem to help with anything, remove
     }
 
     /* collect mod information for each target function */
@@ -83,12 +92,12 @@ void ModRefAnalysis::run() {
     computeModInfoToStoreMap();
 
     /* debug */
-    //dumpModSetMap();
-    //dumpDependentLoads();
-    //dumpLoadToModInfoMap();
-    //dumpModInfoToStoreMap();
-    //dumpModInfoToIdMap();
-    //dumpOverridingStores();
+    // dumpModSetMap();
+    // dumpDependentLoads();
+    // dumpLoadToModInfoMap();
+    // dumpModInfoToStoreMap();
+    // dumpModInfoToIdMap();
+    // dumpOverridingStores();
 }
 
 ModRefAnalysis::ModInfoToStoreMap &ModRefAnalysis::getModInfoToStoreMap() {

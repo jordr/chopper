@@ -15,6 +15,7 @@
 
 #include "klee/Internal/Analysis/AAPass.h"
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 
 using namespace std;
 using namespace llvm;
@@ -103,10 +104,13 @@ bool ReachabilityAnalysis::run(bool usePA) {
     string name = *i;
     Function *f = module->getFunction(name);
     if (!f) {
-      errs() << "function '" << name << "' is not found\n";
-      return false;
+      // errs() << "function '" << name << "' is not found\n";
+      // return false;
+      // JOR don't return here, treat this as non-critical
+      klee::klee_warning("[ReachabilityAnalysis] function '%s' is not found", name.c_str());
+      continue;
     }
-    // targetFunctions.push_back(f); //JOR: this is useless??
+    //targetFunctions.push_back(f); //JOR: this is useless??
     all.push_back(f);
   }
 
