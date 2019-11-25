@@ -91,6 +91,11 @@ namespace {
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));
 
+  cl::opt<bool>
+  AutoKeep("autokeep",
+           cl::desc("Automatically tag some functions (libc...) for keeping"),
+           cl::init(true));
+
   cl::opt<std::string>
   InlinedFunctions("inline",
                    cl::desc("Comma-separated list of functions to be inlined (e.g. <function1>,<function2>,..)"),
@@ -1594,6 +1599,7 @@ int main(int argc, char **argv, char **envp) {
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
+  IOpts.autoKeep = AutoKeep;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
   Interpreter *interpreter =
     theInterpreter = Interpreter::create(IOpts, handler);

@@ -1702,37 +1702,42 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
       }
       
       llvm::StringRef filename;
-      { // JOR: getting the filename
-        DebugInfoFinder Finder;
-        Finder.processModule(*f->getParent());
-        for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
-          const MDNode* node = *Iter;
-          DISubprogram SP(node);
-          if (SP.describes(f)) {
-            filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
-            break;
+      if(!interpreterOpts.autoKeep)
+        kept = kept == 2 ? 2 : 0;
+      else
+      {
+        { // JOR: getting the filename
+          DebugInfoFinder Finder;
+          Finder.processModule(*f->getParent());
+          for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
+            const MDNode* node = *Iter;
+            DISubprogram SP(node);
+            if (SP.describes(f)) {
+              filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
+              break;
+            }
           }
         }
-      }
 
-      if(!kept && filename.startswith(StringRef("libc/")))
-      {
-        kept = 1;
-        reasonStr = "libc";
+        if(!kept && filename.startswith(StringRef("libc/")))
+        {
+          kept = 1;
+          reasonStr = "libc";
+        }
+        // if(!kept && f->hasWeakLinkage()) {
+        //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
+        //   kept = 1;
+        //   str = " (Weak linkage)";
+        // }
+        // else if(!kept && f->hasInternalLinkage()) {
+        //   klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
+        //   kept = 1;
+        //   reasonStr = "Internal linkage)";
+        // }
+        // else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage())) {
+        //   klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
+        // }
       }
-      // if(!kept && f->hasWeakLinkage()) {
-      //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
-      //   kept = 1;
-      //   str = " (Weak linkage)";
-      // }
-      // else if(!kept && f->hasInternalLinkage()) {
-      //   klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
-      //   kept = 1;
-      //   reasonStr = "Internal linkage)";
-      // }
-      // else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage())) {
-      //   klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
-      // }
 
       klee::klee_message("\e[49m%s\e[0;m|%s '%s'... (%s)",
         prettifyFileName(filename).c_str(),
@@ -1811,6 +1816,11 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
+  static int indent = 0;
+  // static std::string lastCall = "";
+  // static std::vector<llvm::Function*> callStack;
+  static std::vector<std::string> callStack;
+
   Instruction *i = ki->inst;
   /* TODO: replace with a better predicate (call stack counter?) */
   if (state.isRecoveryState() && state.getExitInst() == i) {
@@ -1818,15 +1828,24 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     return;
   }
 
-  // klee_warning(" INST [%s]", i->getOpcodeName());
   switch (i->getOpcode()) {
     // Control flow
-  case Instruction::Ret: {
+  case Instruction::Ret: {    
     ReturnInst *ri = cast<ReturnInst>(i);
     KInstIterator kcaller = state.stack.back().caller;
     Instruction *caller = kcaller ? kcaller->inst : 0;
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
+
+    indent--;
+    std::string prefix;
+    for(int i = 0; i < indent; i++)
+      prefix += ' ';
+    klee_message("%s / RET %s", prefix.c_str(), i->getParent()->getParent()->getName().str().c_str());
+    if(!(i->getParent()->getParent()->getName().str() == callStack.back())
+     && !i->getParent()->getParent()->getName().startswith(callStack.back()))
+      klee_warning("'%s' != '%s' from call stack", i->getParent()->getParent()->getName().str().c_str(), callStack.back().c_str());
+    callStack.pop_back();
     
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
@@ -2100,7 +2119,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     if (f) {
       // JOR: debugging
-      klee_message("CALLING '\e[0;96m%s\e[0;m'", f->getName().str().c_str());
+      std::string prefix;
+      std::string parentOfCall = i->getParent()->getParent()->getName().str();
+      if(!callStack.empty() && parentOfCall != callStack.back())
+        klee_warning("no return from '%s'? (call is from '%s')", callStack.back().c_str(), parentOfCall.c_str());
+      if(!f->getName().startswith(StringRef("__wrap")))
+      {
+        indent++;
+        callStack.push_back(f->getName().str());
+      }
+      assert(indent >= 0);
+      for(int i = 0; i < indent; i++) prefix += ' ';
+      prefix += "|_ ";
+      klee_message("%sCALL '\e[0;96m%s\e[0;m' (from %s)", prefix.c_str(), f->getName().str().c_str(), parentOfCall.c_str());
 
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());

@@ -233,8 +233,8 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
   if(!(Args.size() == FTy->getNumParams() || (FTy->isVarArg() && Args.size() > FTy->getNumParams())))
   {
     // klee_error("Wrapper has bad signature! LLVM refuses to create call.");
-    klee_warning("\e[1;35mWrapper has bad signature! LLVM refuses to create call. Args.size()=%d, FTy->getNumParams()=%d, FTY->isVarArg()=%d",
-      (int)Args.size(), FTy->getNumParams(), (FTy->isVarArg()));
+    klee_warning("\e[1;35mWrapper has bad signature: '%s'! LLVM refuses to create call. Args.size()=%d, FTy->getNumParams()=%d, FTY->isVarArg()=%d",
+      f->getName().str().c_str(), (int)Args.size(), FTy->getNumParams(), (FTy->isVarArg()));
     return 1;
   }
   for (unsigned i = 0; i != Args.size(); ++i)

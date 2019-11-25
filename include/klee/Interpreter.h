@@ -116,6 +116,8 @@ public:
     SkipMode skipMode;
     /* @brief Chopper: Functions to be skipped, regardless of the skipMode */
     std::vector<SkippedFunctionOption> skippedFunctions;
+    /* @brief Chopper: Enable autokeep in only-keep mode */
+    bool autoKeep;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;
