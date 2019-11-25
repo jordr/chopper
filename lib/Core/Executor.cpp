@@ -1636,6 +1636,31 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
     debugFile << "     [no debug info]:";
 }
 
+static std::string prettifyFileName(StringRef filename)
+{
+    const char* sep = "\u25B6";
+    std::string filenamePretty = filename;
+    if(filename.find("/") != filename.npos)
+    {
+      const std::string rootStr = filename.str().substr(0, filename.find("/"));
+      std::string remainderStr = filename.substr(filename.find("/")+1);
+      const int totalSize = rootStr.size() + remainderStr.size();
+      if(totalSize > 30)
+        remainderStr = "..." + remainderStr.substr(totalSize - 27);
+      filenamePretty = "\e[0;34m\e[7m" + rootStr + "\e[0;34m\e[49m" + sep + "\e[27m" + remainderStr;
+      if(totalSize < 30)
+        filenamePretty.insert(filenamePretty.end(), 30 - (totalSize), ' ');
+    }
+    else if(filename.size() < 30)
+    {
+      filenamePretty.insert(filenamePretty.end(), 31 - filenamePretty.size(), ' ');
+      filenamePretty = "\e[0;34m" + filenamePretty;
+    }
+
+    filenamePretty += "\e[27m\e[0;44m";
+    return filenamePretty;
+}
+
 // JOR:
 void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Module *module, const ModuleOptions &opts)
 {
@@ -1661,18 +1686,18 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
       if(f->isIntrinsic())
       {
         kept = 1;
-        reasonStr = " (Intrinsic)";
+        reasonStr = "Intrinsic";
       }
       else if(f->hasHiddenVisibility())
       {
         kept = 1;
-        reasonStr = " (Hidden visibility)";
+        reasonStr = "Hidden visibility";
       }
       else for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
         if(i->name == k_fun)
         {
           kept = 2;
-          reasonStr = " (Selected)";
+          reasonStr = "Selected";
         }
       }
       
@@ -1684,42 +1709,41 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
           const MDNode* node = *Iter;
           DISubprogram SP(node);
           if (SP.describes(f)) {
-            filename = SP.getFilename();
+            filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
             break;
           }
         }
       }
 
-      // if(!kept && f->hasWeakLinkage())
-      // {
+      if(!kept && filename.startswith(StringRef("libc/")))
+      {
+        kept = 1;
+        reasonStr = "libc";
+      }
+      // if(!kept && f->hasWeakLinkage()) {
       //   klee_warning("Autokeeping function with weak linkage: %s", k_fun.str().c_str());
       //   kept = 1;
       //   str = " (Weak linkage)";
       // }
-      if(!kept && filename.startswith(StringRef("libc/")))
-      {
-        // klee_warning("Autokeeping libc function: %s", k_fun.str().c_str());
-        kept = 1;
-        reasonStr = " (libc)";
-      }
-      // else if(!kept && f->hasInternalLinkage())
-      // {
+      // else if(!kept && f->hasInternalLinkage()) {
       //   klee_warning("Autokeeping function with internal linkage: %s", k_fun.str().c_str());
       //   kept = 1;
-      //   reasonStr = " (Internal linkage)";
+      //   reasonStr = "Internal linkage)";
       // }
-      else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage()))
-      {
-        klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
-      }
+      // else if(!kept && (f->hasDLLExportLinkage() || f->hasDLLImportLinkage())) {
+      //   klee_error("Skipping DLL function: %s. We probably don't want to do that?", k_fun.str().c_str());
+      // }
 
-      klee::klee_message("%s '%s'...%s (%s)", 
-        (kept == 1 ? "|AUTOKEEP|\e[0;32m" : (!kept ? "|SKIP    |\e[0;31m" : "|KEEP    |\e[0;92m")),
-        k_fun.str().c_str(), reasonStr.c_str(), filename.str().c_str());
+      klee::klee_message("\e[49m%s\e[0;m|%s '%s'... (%s)",
+        prettifyFileName(filename).c_str(),
+        (kept == 1 ? "AUTOKEEP|\e[0;33m" : (!kept ? "SKIP    |\e[0;31m" : "KEEP    |\e[0;92m")),
+        k_fun.str().c_str(),
+        reasonStr.c_str());
+
       if(!kept)
         targets.push_back(k_fun);
-      else if(kept == 1) // autokeep: we have to add it to the skippedFunctions vectors
-      {
+      else if(kept == 1) {
+        // autokeep: we have to add it to the skippedFunctions vectors
         std::vector<unsigned int> empty_lines;
         interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(k_fun, empty_lines));
       }
