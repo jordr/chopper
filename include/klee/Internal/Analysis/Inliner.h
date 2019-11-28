@@ -21,6 +21,8 @@ public:
 
   void run();
 
+  // virtual inline const char *getPassName() const { return "Inliner"; }
+
 private:
   void inlineCalls(llvm::Function *f, std::vector<std::string> functions);
 

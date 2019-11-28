@@ -1714,10 +1714,10 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
 
       // TODO move out of the loop
       if(kept == 2) {
-        const std::set<llvm::Function*>& Ancestors = BottomUpPass::buildReverseReachabilityMap(*CG, f);
+        const std::set<const llvm::Function*>& Ancestors = BottomUpPass::buildReverseReachabilityMap(*CG, f);
         klee_message("Ancestors found: %d", Ancestors.size());
         for(auto ci = Ancestors.begin(); ci != Ancestors.end(); ci++) {
-          klee_warning("!!ALSO ADD ANCESTOR %s", (*ci)->getName().str().c_str());
+          klee_warning("!! ALSO ADD ANCESTOR '%s' OF '%s'", (*ci)->getName().str().c_str(), k_fun.str().c_str());
         }
       }
       
@@ -2150,7 +2150,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
       assert(indent >= 0);
       for(int i = 0; i < indent; i++) prefix += ' ';
-      prefix += "\\ ";
+      prefix += "\\ \t";
       klee_message("%sCALL '\e[0;96m%s\e[0;m' (from %s)", prefix.c_str(), f->getName().str().c_str(), parentOfCall.c_str());
 
       const FunctionType *fType = 

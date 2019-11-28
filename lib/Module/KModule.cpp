@@ -237,6 +237,7 @@ static void forceImport(Module *m, const char *name, LLVM_TYPE_Q Type *retType,
 }
 #endif
 
+#include "klee/Internal/Analysis/BottomUp.h"
 
 void KModule::addInternalFunction(const char* functionName){
   Function* internalFunction = module->getFunction(functionName);

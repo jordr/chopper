@@ -195,6 +195,7 @@ public:
   {
     
   }
+  virtual inline const char *getPassName() const { return "ReturnToVoidFunctionPass"; }
   virtual bool runOnModule(llvm::Module &module);
   virtual bool runOnFunction(llvm::Function &f, llvm::Module &modue);
   llvm::Function *createWrapperFunction(llvm::Function &f, llvm::Module &module);

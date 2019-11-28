@@ -30,26 +30,28 @@ char BottomUpPass::ID = 0;
 static RegisterPass<BottomUpPass>
 X ("bottomup", "??? not this -> Insert control-flow integrity run-time checks");
 
-std::set<llvm::Function*> BottomUpPass::buildReverseReachabilityMap(CallGraph & CG, Function* F) {
+std::set<const llvm::Function*> BottomUpPass::buildReverseReachabilityMap(CallGraph & CG, Function* F) {
   /* // Get the call graph.
   CallGraph & CG = getAnalysis<CallGraph>();
   // Get the call graph node for the function containing the call.
   CallGraphNode * CGN = CG[F]; */
 
   // SmallVector<Function *, 40> Ancestors;
-  std::set<Function*> Ancestors;
-  SmallVector<Function*, 20> wl;
+  std::set<const Function*> Ancestors;
+  SmallVector<const Function*, 20> wl;
   wl.push_back(F);
   // for (CallGraphNode::iterator ti = CGN->begin(); ti != CGN->end(); ++ti) {
   while(! wl.empty()) {
     bool isComplete;
-    Function* fun = wl.pop_back_val();
-    klee::klee_message("wl.pop = %s", fun->getName().str().c_str());
-    const llvm::SmallVector<Function *, 20>& callers = createCallerTable(CG, fun, isComplete);
-    for(auto ci = callers.begin(); ci != callers.end(); ci++)
-      if(! (Ancestors.find(*ci) != Ancestors.end())) // we already know about this parent
-        wl.push_back(*ci);
-    Ancestors.insert(callers.begin(), callers.end());
+    const Function* fun = wl.pop_back_val();
+    const llvm::SmallVector<const Function *, 20>& callers = createCallerTable(CG, fun, isComplete);
+    for(auto ci = callers.begin(); ci != callers.end(); ci++) {
+      if(*ci != F) {
+        if(Ancestors.find(*ci) != Ancestors.end()) // we already know about this parent
+          wl.push_back(*ci);
+        Ancestors.insert(callers.begin(), callers.end());
+      }
+    }
     // assert(isComplete); //TODO: JOR: investigate?
   }
 
@@ -57,61 +59,62 @@ std::set<llvm::Function*> BottomUpPass::buildReverseReachabilityMap(CallGraph & 
 }
 
 // GlobalVariable* 
-llvm::SmallVector<Function *, 20>
-BottomUpPass::createCallerTable (CallGraph & CG, Function* F, bool &isComplete) {
-  SmallVector<Function *, 20> Targets;
+llvm::SmallVector<const Function *, 20>
+BottomUpPass::createCallerTable (CallGraph & CG, const Function* F, bool &isComplete) {
+  SmallVector<const Function *, 20> Callers;
   // CallGraph & CG = getAnalysis<CallGraph>();
   // CallGraphNode * CGN = CG[F];
   // Get the call graph node for the function containing the call.
-  CallGraphNode * CGN;
-  for(auto cgni = CG.begin(); ; cgni++) {
-    klee::klee_message("cgni = %d", (*cgni).first); //(*cgni).first->getName().str().c_str());
-    if(cgni == CG.end()) // function not found
-      return Targets;
-    if((*cgni).first == F) {
-      CGN = (*cgni).second;
-      break;
-    }
-  }
-
-  // Iterate through all of the target call nodes and add them to the list of
-  // targets to use in the global variable.
   isComplete = true;
-  PointerType * VoidPtrType = BottomUpPass::getVoidPtrType(F->getContext());
-  for (CallGraphNode::iterator ti = CGN->begin(); ti != CGN->end(); ++ti) {
-    // See if this call record corresponds to the call site in question.
-    CallGraphNode * CalleeNode = ti->second;
-    Function * Target = CalleeNode->getFunction();
 
-    if (Target != F)
+  for(auto cgni = CG.begin(); cgni != CG.end(); cgni++) {
+    const Function* Caller = (*cgni).first;
+    CallGraphNode *CGN = (*cgni).second;
+    if(Caller == F)
       continue;
 
-    const Value * V = ti->first;
-    const CallInst & CI = (CallInst &)*V; // TODO: JOR: is that okay?...
-    const Function* CallerF = CI.getParent()->getParent();
+    // Iterate through all of the target call nodes and add them to the list of
+    // targets to use in the global variable.
+    // PointerType * VoidPtrType = BottomUpPass::getVoidPtrType(F->getContext());
+    for (CallGraphNode::iterator ti = CGN->begin(); ti != CGN->end(); ++ti) {
+      // See if this call record corresponds to the call site in question.
+      CallGraphNode * CalleeNode = ti->second;
+      Function * Target = CalleeNode->getFunction();
 
-    // If there is no caller function, then this call can call code external
-    // to the module.  In that case, mark the call as incomplete.
-    if (!CallerF) {
-      isComplete = false;
-      continue;
+      if (Target != F)
+        continue;
+
+      // If there is no called function, then this call can call code external
+      // to the module.  In that case, mark the call as incomplete.
+      if (!Caller) {
+        isComplete = false;
+        continue;
+      }
+
+      if(Target)
+        klee::klee_message("\t Target = %s, Source = %s, F = %s", Target->getName().str().c_str(), Caller->getName().str().c_str(), F->getName().str().c_str());
+
+      #if 0
+      const Value * V = ti->first;
+      const CallInst & CI = (CallInst &)*V; // TODO: JOR: is that okay?...
+      const Function* CallerF = CI.getParent()->getParent();
+      #endif
+
+      // Do not include intrinsic functions or functions that do not get
+      // emitted into the final executable as targets.
+      if ((Caller->isIntrinsic()) ||
+          (Caller->hasAvailableExternallyLinkage())) {
+        continue;
+      }
+
+      Callers.push_back(Caller); // JOR: why would I cast it to a void pointer?
+
+      // Add the target to the set of targets.  Cast it to a void pointer
+      // first.
+      // Targets.push_back (ConstantExpr::getZExtOrBitCast (Target, VoidPtrType));
     }
-
-    // Do not include intrinsic functions or functions that do not get
-    // emitted into the final executable as targets.
-    if ((CallerF->isIntrinsic()) ||
-        (CallerF->hasAvailableExternallyLinkage())) {
-      continue;
-    }
-
-    Targets.push_back(Target); // JOR: why would I cast it to a void pointer?
-
-    // Add the target to the set of targets.  Cast it to a void pointer
-    // first.
-    // Targets.push_back (ConstantExpr::getZExtOrBitCast (Target, VoidPtrType));
   }
-
-  return Targets;
+  return Callers;
   /*
   // Truncate the list with a null pointer.
   Targets.push_back(ConstantPointerNull::get (VoidPtrType));

@@ -27,10 +27,10 @@ public:
 
   virtual inline const char *getPassName() const { return "BottomUp Pass"; }
 
-  static std::set<llvm::Function*> buildReverseReachabilityMap(llvm::CallGraph & CG, llvm::Function* F);
+  static std::set<const llvm::Function*> buildReverseReachabilityMap(llvm::CallGraph & CG, llvm::Function* F);
 
   // virtual llvm::GlobalVariable* createCallerTable (llvm::Function* f, bool &isComplete);
-  static llvm::SmallVector<llvm::Function *, 20> createCallerTable (llvm::CallGraph & CG, llvm::Function* f, bool &isComplete);
+  static llvm::SmallVector<const llvm::Function *, 20> createCallerTable (llvm::CallGraph & CG, const llvm::Function* f, bool &isComplete);
 
   // virtual llvm::GlobalVariable* createTargetTable (llvm::CallInst & CI, bool &isComplete);
 
