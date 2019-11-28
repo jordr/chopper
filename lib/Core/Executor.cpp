@@ -440,6 +440,7 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   mra = NULL;
   cloner = NULL;
   sliceGenerator = NULL;
+  bottomUp = NULL;
 }
 
 const Module *Executor::setModule(llvm::Module *module, 
@@ -507,6 +508,7 @@ Executor::~Executor() {
   if (cloner) delete cloner;
   if (mra) delete mra;
   if (inliner) delete inliner;
+  if (bottomUp) delete bottomUp;
   if (ra) delete ra;
   delete kmodule;
   while(!timers.empty()) {
@@ -1668,11 +1670,20 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
     for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
       targets.push_back(i->name);
     }
+    return;
   }
 
   logFile = interpreterHandler->openOutputFile("sa.log");
 
   if (interpreterOpts.skipMode == Interpreter::CHOP_KEEP) {
+    /* Initialize the callgraph */
+    klee_message("Building callgraph...");
+    PassManager pm;
+    CallGraph* CG = new CallGraph();
+    // pm.add(CG);
+    CG->runOnModule(*module);
+    // pm.run(*module);
+
     klee_warning("Building target list of skipped functions...");
     for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
       llvm::Value* v_fun = (*i).getValue();
@@ -1698,6 +1709,15 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
         {
           kept = 2;
           reasonStr = "Selected";
+        }
+      }
+
+      // TODO move out of the loop
+      if(kept == 2) {
+        const std::set<llvm::Function*>& Ancestors = BottomUpPass::buildReverseReachabilityMap(*CG, f);
+        klee_message("Ancestors found: %d", Ancestors.size());
+        for(auto ci = Ancestors.begin(); ci != Ancestors.end(); ci++) {
+          klee_warning("!!ALSO ADD ANCESTOR %s", (*ci)->getName().str().c_str());
         }
       }
       
@@ -2130,7 +2150,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
       assert(indent >= 0);
       for(int i = 0; i < indent; i++) prefix += ' ';
-      prefix += "|_ ";
+      prefix += "\\ ";
       klee_message("%sCALL '\e[0;96m%s\e[0;m' (from %s)", prefix.c_str(), f->getName().str().c_str(), parentOfCall.c_str());
 
       const FunctionType *fType = 

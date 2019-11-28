@@ -31,6 +31,7 @@
 #include "klee/Internal/Analysis/ModRefAnalysis.h"
 #include "klee/Internal/Analysis/Cloner.h"
 #include "klee/Internal/Analysis/SliceGenerator.h"
+#include "klee/Internal/Analysis/BottomUp.h"
 
 #include <vector>
 #include <string>
@@ -225,6 +226,7 @@ private:
   ModRefAnalysis *mra;
   Cloner *cloner;
   SliceGenerator *sliceGenerator;
+  BottomUpPass *bottomUp;
 
   unsigned int errorCount;
 
