@@ -1678,9 +1678,9 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
     klee_message("Building callgraph...");
     PassManager pm;
     CallGraph* CG = new CallGraph();
-    // pm.add(CG);
-    CG->runOnModule(*module);
-    // pm.run(*module);
+    pm.add(CG);
+    // CG->runOnModule(*module);
+    pm.run(*module);
 
     klee_warning("Building target list of skipped functions...");
     for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
@@ -1854,11 +1854,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
 
+    /* pretty printing */
     indent--;
     std::string prefix;
     for(int i = 0; i < indent; i++)
       prefix += ' ';
-    klee_message("%s / RET %s", prefix.c_str(), i->getParent()->getParent()->getName().str().c_str());
+    klee_message("%s / \tRET %s", prefix.c_str(), i->getParent()->getParent()->getName().str().c_str());
     if(!(i->getParent()->getParent()->getName().str() == callStack.back())
      && !i->getParent()->getParent()->getName().startswith(callStack.back()))
       klee_warning("'%s' != '%s' from call stack", i->getParent()->getParent()->getName().str().c_str(), callStack.back().c_str());
