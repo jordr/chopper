@@ -1833,10 +1833,6 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
-  static int indent = 0;
-  // static std::string lastCall = "";
-  // static std::vector<llvm::Function*> callStack;
-  static std::vector<std::string> callStack;
 
   Instruction *i = ki->inst;
   /* TODO: replace with a better predicate (call stack counter?) */
@@ -1854,17 +1850,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
 
-    /* pretty printing */
-    indent--;
-    std::string prefix;
-    for(int i = 0; i < indent; i++)
-      prefix += ' ';
-    klee_message("%s / \tRET %s", prefix.c_str(), i->getParent()->getParent()->getName().str().c_str());
-    if(!(i->getParent()->getParent()->getName().str() == callStack.back())
-     && !i->getParent()->getParent()->getName().startswith(callStack.back()))
-      klee_warning("'%s' != '%s' from call stack", i->getParent()->getParent()->getName().str().c_str(), callStack.back().c_str());
-    callStack.pop_back();
-    
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
     }
@@ -2136,20 +2121,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       arguments.push_back(eval(ki, j+1, state).value);
 
     if (f) {
-      // JOR: debugging
+      /* JOR: debugging */
       std::string prefix;
-      std::string parentOfCall = i->getParent()->getParent()->getName().str();
-      if(!callStack.empty() && parentOfCall != callStack.back())
-        klee_warning("no return from '%s'? (call is from '%s')", callStack.back().c_str(), parentOfCall.c_str());
-      if(!f->getName().startswith(StringRef("__wrap")))
-      {
-        indent++;
-        callStack.push_back(f->getName().str());
-      }
-      assert(indent >= 0);
-      for(int i = 0; i < indent; i++) prefix += ' ';
-      prefix += "\\ \t";
-      klee_message("%sCALL '\e[0;96m%s\e[0;m' (from %s)", prefix.c_str(), f->getName().str().c_str(), parentOfCall.c_str());
+      // std::string parentOfCall = i->getParent()->getParent()->getName().str();
+      for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
+      klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
 
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
