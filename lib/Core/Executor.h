@@ -226,7 +226,7 @@ private:
   ModRefAnalysis *mra;
   Cloner *cloner;
   SliceGenerator *sliceGenerator;
-  BottomUpPass *bottomUp;
+  // BottomUpPass *bottomUp;
 
   unsigned int errorCount;
 

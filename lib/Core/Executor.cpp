@@ -440,7 +440,6 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   mra = NULL;
   cloner = NULL;
   sliceGenerator = NULL;
-  bottomUp = NULL;
 }
 
 const Module *Executor::setModule(llvm::Module *module, 
@@ -508,7 +507,6 @@ Executor::~Executor() {
   if (cloner) delete cloner;
   if (mra) delete mra;
   if (inliner) delete inliner;
-  if (bottomUp) delete bottomUp;
   if (ra) delete ra;
   delete kmodule;
   while(!timers.empty()) {
@@ -1640,7 +1638,7 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
 
 static std::string prettifyFileName(StringRef filename)
 {
-    const char* sep = "\u25B6";
+    const char* sep = "/";//"\u25B6";
     std::string filenamePretty = filename;
     if(filename.find("/") != filename.npos)
     {
@@ -1713,13 +1711,12 @@ void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Modu
       }
 
       // TODO move out of the loop
-      if(kept == 2) {
-        const std::set<const llvm::Function*>& Ancestors = BottomUpPass::buildReverseReachabilityMap(*CG, f);
-        klee_message("Ancestors found: %d", Ancestors.size());
-        for(auto ci = Ancestors.begin(); ci != Ancestors.end(); ci++) {
-          klee_warning("!! ALSO ADD ANCESTOR '%s' OF '%s'", (*ci)->getName().str().c_str(), k_fun.str().c_str());
-        }
-      }
+      // if(kept == 2) {
+      //   const std::set<const llvm::Function*>& Ancestors = BottomUpPass::buildReverseReachabilityMap(*CG, f);
+      //   for(auto ci = Ancestors.begin(); ci != Ancestors.end(); ci++) {
+      //     klee_warning("\t > MUST ANCESTOR '%s' OF '%s'", (*ci)->getName().str().c_str(), k_fun.str().c_str());
+      //   }
+      // }
       
       llvm::StringRef filename;
       if(!interpreterOpts.autoKeep)
