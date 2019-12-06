@@ -4381,8 +4381,9 @@ bool Executor::getAllRecoveryInfo(ExecutionState &state, KInstruction *ki,
     unsigned int index = recoveryInfo->snapshotIndex;
     unsigned int sliceId = recoveryInfo->sliceId;
 
-    DEBUG_WITH_TYPE(
-      DEBUG_BASIC,
+    // JOR:
+    // DEBUG_WITH_TYPE(
+    //   DEBUG_BASIC,
       klee_message(
         "recovery info: addr = %#lx, size = %lx, function: %s, slice id = %u, snapshot index = %u",
         recoveryInfo->loadAddr,
@@ -4390,7 +4391,7 @@ bool Executor::getAllRecoveryInfo(ExecutionState &state, KInstruction *ki,
         recoveryInfo->f->getName().data(),
         recoveryInfo->sliceId,
         recoveryInfo->snapshotIndex
-      )
+      // )
     );
 
     ref<Expr> expr;
