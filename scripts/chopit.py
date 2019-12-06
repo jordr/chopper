@@ -26,8 +26,11 @@ def main(main_args):
     parser.add_argument('-f', '--noskip', help='Functions *not* to skip')
     parser.add_argument('-s', '--skip', help='Functions to skip')
     parser.add_argument('-r', '--repo', help='Repository to get the diff from')
-    parser.add_argument('-w', '--wfilter', help='Warnings to filter')
     parser.add_argument('-i', help='Interactive mode', action='store_true')
+    # from KLEE
+    parser.add_argument('-w', '--wfilter', help='Warnings to filter out (KLEE option)')
+    parser.add_argument('--inline', help='(KLEE option)')
+    parser.add_argument('--debugonly', help='(KLEE option)')
     # from diffanalyze
     parser.add_argument('--revision', help='repository revision', default='HEAD')
     # parser.add_argument('-ri', '--rangeInt', type=int, metavar='N', help='look at patches for the previous N commits (preceding HASH)')
@@ -79,10 +82,14 @@ def main(main_args):
     os.system("mv -v callgraph-chopped.dot callgraph-raw-chopped.dot")
 
     # CHOPPER
-    wfilter = ""
+    klee_params = ""
     if args['wfilter']:
-        wfilter = "-w=" + args['wfilter'] + " "
-    klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -output-module -skip-functions-not=" + noskip + " " + wfilter + args['file']
+        klee_params += " -w=" + args['wfilter']
+    if args['inline']:
+        klee_params += " --inline=" + args['inline']
+    if args['debugonly']:
+        klee_params += " --debug-only=" + args['debugonly']
+    klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -output-module -skip-functions-not=" + noskip + klee_params + " " + args['file']
     print("Running Chopper...\n" + colored(klee_command, 'yellow'))
     if args['i']:
         input("...")
