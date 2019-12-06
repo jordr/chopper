@@ -30,6 +30,7 @@ char BottomUpPass::ID = 0;
 static RegisterPass<BottomUpPass>
 X ("bottomup", "Look for all possible paths from the root to a function");
 
+// JOR: TODO: This working list algorithm could be improved, it parses the same element in the working list several times
 std::set<const llvm::Function*> BottomUpPass::buildReverseReachabilityMap(CallGraph & CG, Function* F) {
   // SmallVector<Function *, 40> Ancestors;
   std::set<const Function*> Ancestors;
@@ -41,7 +42,11 @@ std::set<const llvm::Function*> BottomUpPass::buildReverseReachabilityMap(CallGr
     const llvm::SmallVector<const Function *, 20>& callers = createCallerTable(CG, fun, isComplete);
     for(auto ci = callers.begin(); ci != callers.end(); ci++) {
       if(*ci != F) {
-        if(Ancestors.find(*ci) == Ancestors.end()) // we do not already know about this parent
+        klee::klee_message("\t-Ancestor: '%s' (calls '%s')", 
+          (*ci)->getName().str().c_str(),
+          fun->getName().str().c_str());
+        if(Ancestors.find(*ci) == Ancestors.end())
+          // if we do not already know about this parent
           wl.push_back(*ci);
         Ancestors.insert(callers.begin(), callers.end());
       }

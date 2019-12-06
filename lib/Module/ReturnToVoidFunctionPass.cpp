@@ -232,7 +232,6 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
   llvm::ArrayRef<Value*> Args = makeArrayRef(argsForCall);
   if(!(Args.size() == FTy->getNumParams() || (FTy->isVarArg() && Args.size() > FTy->getNumParams())))
   {
-    // klee_error("Wrapper has bad signature! LLVM refuses to create call.");
     klee_warning("\e[1;35mWrapper has bad signature: '%s'! LLVM refuses to create call. Args.size()=%d, FTy->getNumParams()=%d, FTY->isVarArg()=%d",
       f->getName().str().c_str(), (int)Args.size(), FTy->getNumParams(), (FTy->isVarArg()));
     return 1;
@@ -241,8 +240,8 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
   {
     if(! (i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) )
     {
-      klee_warning("\e[1;35mWrapper has bad signature! bad type of Args[%d].type=%d =/= wrapper.type=%d\
-        LLVM refuses to create call.\e[0;m", i, Args[i]->getType()->getTypeID(), FTy->getParamType(i)->getTypeID());
+      klee_warning("\e[1;35mWrapper has bad signature: '%s'! bad type of Args[%d].type=%d =/= wrapper.type=%d LLVM refuses to create call.\e[0;m",
+        f->getName().str().c_str(), i, Args[i]->getType()->getTypeID(), FTy->getParamType(i)->getTypeID());
       return 1;
     }
   }
