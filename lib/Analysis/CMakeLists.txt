@@ -8,6 +8,7 @@
 #===------------------------------------------------------------------------===#
 
 klee_add_component(kleeAnalysis
+    Keeper.cpp
     ReachabilityAnalysis.cpp
     Inliner.cpp
     AAPass.cpp

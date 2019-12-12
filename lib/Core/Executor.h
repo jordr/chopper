@@ -25,13 +25,13 @@
 
 #include "llvm/ADT/Twine.h"
 
+#include "klee/Internal/Analysis/Keeper.h"
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
 #include "klee/Internal/Analysis/Inliner.h"
 #include "klee/Internal/Analysis/AAPass.h"
 #include "klee/Internal/Analysis/ModRefAnalysis.h"
 #include "klee/Internal/Analysis/Cloner.h"
 #include "klee/Internal/Analysis/SliceGenerator.h"
-#include "klee/Internal/Analysis/BottomUp.h"
 
 #include <vector>
 #include <string>
@@ -220,6 +220,7 @@ private:
   /* TODO: ... */
   std::vector<ExecutionState *> suspendedStates;
   std::vector<ExecutionState *> resumedStates;
+  Keeper *keeper;
   ReachabilityAnalysis *ra;
   Inliner *inliner;
   AAPass *aa;

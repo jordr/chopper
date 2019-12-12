@@ -115,7 +115,7 @@ public:
     /* @brief Chopper: selected skip mode */
     SkipMode skipMode;
     /* @brief Chopper: Functions to be skipped, regardless of the skipMode */
-    std::vector<SkippedFunctionOption> skippedFunctions;
+    std::vector<SkippedFunctionOption> skippedFunctions; // JOR: TODO: rename this to selectedFunctions, very confusing
     /* @brief Chopper: Enable autokeep in only-keep mode */
     bool autoKeep;
     std::vector<std::string> inlinedFunctions;

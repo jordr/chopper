@@ -7,7 +7,6 @@
 #
 #===------------------------------------------------------------------------===#
 klee_add_component(kleeModule
-  BottomUp.cpp
   Checks.cpp
   InstructionInfoTable.cpp
   IntrinsicCleaner.cpp

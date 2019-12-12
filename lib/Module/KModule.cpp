@@ -56,6 +56,7 @@
 
 #include <llvm/Transforms/Utils/Cloning.h>
 
+#include "klee/Internal/Analysis/Keeper.h"
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
 #include "klee/Internal/Analysis/Inliner.h"
 #include "klee/Internal/Analysis/AAPass.h"
@@ -236,8 +237,6 @@ static void forceImport(Module *m, const char *name, LLVM_TYPE_Q Type *retType,
   }
 }
 #endif
-
-#include "klee/Internal/Analysis/BottomUp.h"
 
 void KModule::addInternalFunction(const char* functionName){
   Function* internalFunction = module->getFunction(functionName);

@@ -31,3 +31,8 @@ lit.site.cfg
 autoconf/aclocal.m4
 autoconf/autom4te.cache/
 autom4te.cache/
+
+#JOR
+examples/
+legacy_build/
+lib/.vscode/

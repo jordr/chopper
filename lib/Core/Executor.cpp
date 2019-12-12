@@ -63,7 +63,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/User.h"
-#include <llvm/IR/ValueSymbolTable.h> // JOR: Chopper-not
+#include "llvm/IR/ValueSymbolTable.h"
 #else
 #include "llvm/Attributes.h"
 #include "llvm/BasicBlock.h"
@@ -104,6 +104,7 @@
 #include "klee/Internal/Analysis/ModRefAnalysis.h"
 #include "klee/Internal/Analysis/Cloner.h"
 #include "klee/Internal/Analysis/SliceGenerator.h"
+#include "klee/Internal/Analysis/Keeper.h"
 
 #ifdef HAVE_ZLIB_H
 #include "klee/Internal/Support/CompressionStream.h"
@@ -440,6 +441,7 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   mra = NULL;
   cloner = NULL;
   sliceGenerator = NULL;
+  keeper = NULL;
 }
 
 const Module *Executor::setModule(llvm::Module *module, 
@@ -461,9 +463,12 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler->prepare();
 
   if (interpreterOpts.skipMode != CHOP_NONE) {
+    logFile = interpreterHandler->openOutputFile("sa.log");
     /* build target functions */
     std::vector<std::string> skippedTargets;
-    getSkippedFunctions(skippedTargets, module, opts);
+    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.skippedFunctions, interpreterOpts.autoKeep, *logFile);
+    keeper->run();
+    skippedTargets = keeper->getSkippedTargets();
 
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, skippedTargets, *logFile);
     inliner = new Inliner(module, ra, skippedTargets, interpreterOpts.inlinedFunctions, *logFile); // doesn't do anything except if -inline=f is specified
@@ -507,6 +512,7 @@ Executor::~Executor() {
   if (mra) delete mra;
   if (inliner) delete inliner;
   if (ra) delete ra;
+  if (keeper) delete keeper;
   delete kmodule;
   while(!timers.empty()) {
     delete timers.back();
@@ -1633,205 +1639,6 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
     debugFile << "     " << ii.file << ":" << ii.line << ":";
   else
     debugFile << "     [no debug info]:";
-}
-
-static std::string prettifyFileName(StringRef filename)
-{
-    const char* sep = "/";//"\u25B6";
-    std::string filenamePretty = filename;
-    if(filename.find("/") != filename.npos)
-    {
-      const std::string rootStr = filename.str().substr(0, filename.find("/"));
-      std::string remainderStr = filename.substr(filename.find("/")+1);
-      const int totalSize = rootStr.size() + remainderStr.size();
-      if(totalSize > 30)
-        remainderStr = "..." + remainderStr.substr(totalSize - 27);
-      filenamePretty = "\e[0;34m\e[7m" + rootStr + "\e[0;34m\e[49m" + sep + "\e[27m" + remainderStr;
-      if(totalSize < 30)
-        filenamePretty.insert(filenamePretty.end(), 30 - (totalSize), ' ');
-    }
-    else if(filename.size() < 30)
-    {
-      filenamePretty.insert(filenamePretty.end(), 31 - filenamePretty.size(), ' ');
-      filenamePretty = "\e[0;34m" + filenamePretty;
-    }
-
-    filenamePretty += "\e[27m\e[0;44m";
-    return filenamePretty;
-}
-
-// JOR:
-void Executor::getSkippedFunctions(std::vector<std::string>& targets, llvm::Module *module, const ModuleOptions &opts)
-{
-  struct FunctionClass {
-    enum {
-      INVALID=-1,
-      SKIP=0,
-      AUTOKEEP=1,
-      SELECTED=2,
-      ANCESTOR=3,
-    };
-    int type;
-    enum {
-      NONE=0,
-      LIBC,
-      INTRINSIC,
-      HIDDEN_VISIBILITY,
-    };
-    int autokeepReason;
-    std::string key;
-    llvm::StringRef filename;
-
-    FunctionClass() : type(INVALID), autokeepReason(NONE) { }
-    bool operator<(const FunctionClass& fc) {
-      if(this->type < fc.type)
-        return true;
-      if(this->type > fc.type)
-        return false;
-      if(this->type == AUTOKEEP) {
-        if(this->autokeepReason < fc.autokeepReason)
-          return true;
-        if(this->autokeepReason > fc.autokeepReason)
-          return false;
-      }
-      return this->key < fc.key;
-    }
-  };
-
-  if (interpreterOpts.skipMode == Interpreter::CHOP_LEGACY) {
-    for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-      targets.push_back(i->name);
-    }
-    return;
-  }
-
-  logFile = interpreterHandler->openOutputFile("sa.log");
-
-  if (interpreterOpts.skipMode == Interpreter::CHOP_KEEP) {
-    /* Initialize the callgraph */
-    klee_message("Building callgraph...");
-    PassManager pm;
-    CallGraph* CG = new CallGraph();
-    pm.add(CG);
-    CG->runOnModule(*module); // JOR: TODO: pm.run() doesn't do anything, but without pm.add, we get "UNREACHABLE executed"
-    // pm.run(*module);
-
-    klee_message("Seeking ancestors of selected functions...");
-    std::set<const Function*> ancestors;
-    for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
-      llvm::Value* v_fun = (*i).getValue();
-      const llvm::StringRef k_fun = (*i).getKey();
-      Function* f = dyn_cast_or_null<Function>((v_fun));
-      if(!f)
-        continue;
-      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-        if(i->name == k_fun) {
-          // We found a manually selected function
-          const std::set<const llvm::Function*>& ancestorsOfF = BottomUpPass::buildReverseReachabilityMap(*CG, f);
-          for(auto ci = ancestorsOfF.begin(); ci != ancestorsOfF.end(); ci++) {
-            ancestors.insert(*ci);
-          }
-        }
-      }
-    }
-    
-    klee_message("Building target list of skipped functions...");
-    std::vector<FunctionClass> classifiedFunctions;
-    for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
-      llvm::Value* v_fun = (*i).getValue();
-      // const llvm::StringRef k_fun = (*i).getKey();
-      Function* f = dyn_cast_or_null<Function>(/* cast_or_null<GlobalValue> */(v_fun));
-      if(!f)
-          continue;
-
-      FunctionClass funClass;
-      funClass.type = FunctionClass::SKIP;
-      funClass.key = (*i).getKey();
-
-      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
-        if(i->name == funClass.key) {
-          funClass.type = FunctionClass::SELECTED;
-          break;
-        }
-      }
-      if(interpreterOpts.autoKeep) {
-        // autokeep includes ancestor lookup for now
-        if(ancestors.find(f) != ancestors.end()) {
-          funClass.type = FunctionClass::ANCESTOR;
-        }
-        else if(f->isIntrinsic()) {
-          funClass.type = FunctionClass::AUTOKEEP;
-          funClass.autokeepReason = FunctionClass::INTRINSIC;
-        }
-        else if(f->hasHiddenVisibility()) {
-          funClass.type = FunctionClass::AUTOKEEP;
-          funClass.autokeepReason = FunctionClass::HIDDEN_VISIBILITY;
-        }
-        // weak linkage
-        // internal linkage
-        // hasDLLExportLinkage || hasDLLImportLinkage
-      }
-
-      // llvm::StringRef filename;
-      if(interpreterOpts.autoKeep) {
-        { // JOR: getting the filename
-          DebugInfoFinder Finder;
-          Finder.processModule(*f->getParent());
-          for (DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
-            const MDNode* node = *Iter;
-            DISubprogram SP(node);
-            if (SP.describes(f)) {
-              funClass.filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
-              break;
-            }
-          }
-        }
-
-        if(!funClass.type && funClass.filename.startswith(StringRef("libc/")))
-        {
-          funClass.type = FunctionClass::AUTOKEEP;
-          funClass.autokeepReason = FunctionClass::LIBC;
-        }
-      }
-      classifiedFunctions.push_back(funClass);
-    }
-
-    sort(classifiedFunctions.begin(), classifiedFunctions.end());
-    for(auto fi = classifiedFunctions.begin(); fi != classifiedFunctions.end(); fi++) {
-      const char* reasonStr = "";
-
-      if(fi->type == FunctionClass::AUTOKEEP)
-        switch(fi->autokeepReason) {
-          case FunctionClass::LIBC:
-            reasonStr = "(libc)";
-            break;
-          case FunctionClass::HIDDEN_VISIBILITY:
-            reasonStr = "(hidden)";
-            break;
-          case FunctionClass::INTRINSIC:
-            reasonStr = "(intrinsic)";
-            break;
-          default:
-            assert(false && "reason must be set for autokeep");
-        }
-
-      klee::klee_message("\e[49m%s\e[0;m|%s '%s' %s",
-        prettifyFileName(fi->filename).c_str(),
-          (fi->type == FunctionClass::ANCESTOR ? "ANCESTOR|\e[0;32m" : 
-          (fi->type == FunctionClass::AUTOKEEP ? "AUTOKEEP|\e[0;33m" : 
-          (fi->type == FunctionClass::SKIP ? "SKIP    |\e[0;31m" : "KEEP    |\e[0;92m"))),
-        fi->key.c_str(),
-        reasonStr);
-
-      if(fi->type == FunctionClass::SKIP)
-        targets.push_back(fi->key);
-      else if(fi->type == FunctionClass::AUTOKEEP || fi->type == FunctionClass::ANCESTOR) {
-        // autokeep: we have to add it to the skippedFunctions vectors
-        std::vector<unsigned int> empty_lines;
-        interpreterOpts.skippedFunctions.push_back(SkippedFunctionOption(fi->key, empty_lines));
-      }
-    }
-  }
 }
 
 /// Compute the true target of a function call, resolving LLVM and KLEE aliases
