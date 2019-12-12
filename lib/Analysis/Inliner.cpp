@@ -30,7 +30,7 @@ void Inliner::run() {
         Function *entry = module->getFunction(*i);
         if(!entry)
         {
-            klee::klee_warning("Inliner: not looking for calls from '%s': does not exist or unreachable", (*i).c_str());
+            // klee::klee_warning("Inliner: not looking for calls from '%s': does not exist or unreachable", (*i).c_str());
             continue;
         }
 

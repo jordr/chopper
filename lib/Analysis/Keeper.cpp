@@ -6,6 +6,7 @@
 #include "klee/Interpreter.h"
 #include "klee/Internal/Analysis/Keeper.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "../Core/SpecialFunctionHandler.h"
 #include <vector>
 
 using klee::Interpreter;
@@ -105,6 +106,12 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     FunctionClass funClass;
     funClass.type = FunctionClass::SKIP;
     funClass.key = (*i).getKey();
+    
+    for(klee::SpecialFunctionHandler::const_iterator sf = klee::SpecialFunctionHandler::begin(), se = klee::SpecialFunctionHandler::end(); sf != se; ++sf) {
+      if(strcmp(funClass.key.c_str(), sf->name) == 0) {
+        klee::klee_warning("Special function scanned: '%s', doesNotReturn=%d, hasReturnValue=%d", sf->name, sf->doesNotReturn, sf->hasReturnValue);
+      }
+    }
 
     for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
       if(i->name == funClass.key) {
@@ -112,6 +119,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         break;
       }
     }
+
     if(autoKeep) {
       // autokeep includes ancestor lookup for now
       if(ancestors.find(f) != ancestors.end()) {
@@ -128,10 +136,8 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       // weak linkage
       // internal linkage
       // hasDLLExportLinkage || hasDLLImportLinkage
-    }
 
-    // llvm::StringRef filename;
-    if(autoKeep) {
+      // llvm::StringRef filename;
       { // JOR: getting the filename
         llvm::DebugInfoFinder Finder;
         Finder.processModule(*f->getParent());

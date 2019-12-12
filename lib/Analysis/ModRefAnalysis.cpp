@@ -61,8 +61,9 @@ void ModRefAnalysis::run() {
         Function *f = module->getFunction(name);
         if (!f) {
             // errs() << "function '" << name << "' is not found (or unreachable)\n";
-            klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
             // assert(false);
+            
+            // klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
             // targets.erase(i);
             todel.push_back(i);
             continue; // JOR: TODO: ensure safety

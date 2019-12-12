@@ -1955,6 +1955,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // generate unreachable instructions in cases where it knows the
     // program will crash. So it is effectively a SEGV or internal
     // error.
+    state.dumpStack(llvm::errs()); // JOR:
     terminateStateOnExecError(state, "reached \"unreachable\" instruction");
     break;
 
@@ -1988,11 +1989,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       arguments.push_back(eval(ki, j+1, state).value);
 
     if (f) {
-      /* JOR: debugging */
+      // JOR: debugging
       std::string prefix;
-      // std::string parentOfCall = i->getParent()->getParent()->getName().str();
       for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
-      klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
+      if(isFunctionToSkip(state, f))
+        klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
+      else
+        klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
 
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
@@ -4157,6 +4160,13 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
     return false;
   }
 
+  // JOR: debugging
+  std::string prefix;
+  for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
+  for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++) {
+    klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());//, state.stack.back().kf->function->getName().str().c_str());
+  }
+
   /* TODO: move to another place? */
   state.pc = state.prevPC;
 
@@ -4248,9 +4258,8 @@ bool Executor::getAllRecoveryInfo(ExecutionState &state, KInstruction *ki,
     unsigned int index = recoveryInfo->snapshotIndex;
     unsigned int sliceId = recoveryInfo->sliceId;
 
-    // JOR:
-    // DEBUG_WITH_TYPE(
-    //   DEBUG_BASIC,
+    DEBUG_WITH_TYPE(
+      DEBUG_BASIC,
       klee_message(
         "recovery info: addr = %#lx, size = %lx, function: %s, slice id = %u, snapshot index = %u",
         recoveryInfo->loadAddr,
@@ -4258,7 +4267,7 @@ bool Executor::getAllRecoveryInfo(ExecutionState &state, KInstruction *ki,
         recoveryInfo->f->getName().data(),
         recoveryInfo->sliceId,
         recoveryInfo->snapshotIndex
-      // )
+      )
     );
 
     ref<Expr> expr;
@@ -4807,6 +4816,7 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
+    // check NotskippedFunctions
     if(interpreterOpts.skipMode == CHOP_KEEP)
     {
       bool skipped = true;
