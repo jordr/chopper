@@ -26,6 +26,7 @@ def main(main_args):
     parser.add_argument('-f', '--noskip', help='Functions *not* to skip')
     parser.add_argument('-s', '--skip', help='Functions to skip')
     parser.add_argument('-r', '--repo', help='Repository to get the diff from')
+    parser.add_argument('-o', help='Output module', action='store_true')
     parser.add_argument('-i', help='Interactive mode', action='store_true')
     # from KLEE
     parser.add_argument('-w', '--wfilter', help='Warnings to filter out (KLEE option)')
@@ -89,19 +90,22 @@ def main(main_args):
         klee_params += " --inline=" + args['inline']
     if args['debugonly']:
         klee_params += " --debug-only=" + args['debugonly']
-    klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -output-module -skip-functions-not=" + noskip + klee_params + " " + args['file']
+    if args['o']:
+    	klee_params += " -output-module"
+    klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -skip-functions-not=" + noskip + klee_params + " " + args['file']
     print("Running Chopper...\n" + colored(klee_command, 'yellow'))
     if args['i']:
         input("...")
 
     os.system(klee_command)
 
-    print ("Generating callgraph.dot...")
-    os.system("opt -dot-callgraph " + "./klee-last/final.bc" + " 1>/dev/null")
-    print ("...\033[1;32m OK\033[0m")
-    print ("Generating callgraph-chopped.dot...", end='', flush=True)
-    os.system("choppy-dot " + noskip + " ./callgraph")
-    print ("\033[1;32m OK\033[0m")
+    if(args['o']):
+	    print ("Generating callgraph.dot...")
+	    os.system("opt -dot-callgraph " + "./klee-last/final.bc" + " 1>/dev/null")
+	    print ("...\033[1;32m OK\033[0m")
+	    print ("Generating callgraph-chopped.dot...", end='', flush=True)
+	    os.system("choppy-dot " + noskip + " ./callgraph")
+	    print ("\033[1;32m OK\033[0m")
 
 if __name__ == '__main__':
     main(sys.argv[1:])
