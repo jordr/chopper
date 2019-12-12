@@ -1595,7 +1595,7 @@ int main(int argc, char **argv, char **envp) {
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   IOpts.skipMode = skipMode;
-  IOpts.skippedFunctions = skipMode == Interpreter::CHOP_KEEP ? skippingOptionsNot : skippingOptionsLegacy;
+  IOpts.selectedFunctions = skipMode == Interpreter::CHOP_KEEP ? skippingOptionsNot : skippingOptionsLegacy;
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
@@ -1779,7 +1779,7 @@ int main(int argc, char **argv, char **envp) {
   /* these are relevant only when we have a slicing option */
   if (IOpts.skipMode) {
     stats << "KLEE: done: " << (IOpts.skipMode == Interpreter::CHOP_KEEP ? "kept" : "skipped") << " functions = "
-          << IOpts.skippedFunctions.size() << "\n";
+          << IOpts.selectedFunctions.size() << "\n";
     stats << "KLEE: done: recovery states = "
           << handler->getRecoveryStatesCount() << "\n";
     stats << "KLEE: done: generated slices = "

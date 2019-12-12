@@ -31,7 +31,7 @@ private:
 
   llvm::Module *module;
   klee::Interpreter::SkipMode skipMode;
-  std::vector<klee::Interpreter::SkippedFunctionOption>& functionsToKeep; // comes from interpreterOpts.skippedFunctions
+  std::vector<klee::Interpreter::SkippedFunctionOption>& functionsToKeep; // comes from interpreterOpts.selectedFunctions
   bool autoKeep;
   llvm::raw_ostream &debugs;
 };

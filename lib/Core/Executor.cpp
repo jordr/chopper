@@ -63,7 +63,6 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/User.h"
-#include "llvm/IR/ValueSymbolTable.h"
 #else
 #include "llvm/Attributes.h"
 #include "llvm/BasicBlock.h"
@@ -466,7 +465,7 @@ const Module *Executor::setModule(llvm::Module *module,
     logFile = interpreterHandler->openOutputFile("sa.log");
     /* build target functions */
     std::vector<std::string> skippedTargets;
-    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.skippedFunctions, interpreterOpts.autoKeep, *logFile);
+    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
     keeper->run();
     skippedTargets = keeper->getSkippedTargets();
 
@@ -482,7 +481,7 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
-  kmodule->prepare(opts, interpreterOpts.skipMode, interpreterOpts.skippedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  kmodule->prepare(opts, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -4808,13 +4807,12 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
-    // check NotskippedFunctions
     if(interpreterOpts.skipMode == CHOP_KEEP)
     {
       bool skipped = true;
       //JOR: this seems to parse wrappers only, so only skipped functions?
       DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str()));
-      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
+      for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
           const SkippedFunctionOption &option = *i;
           // klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
           if (option.name == "" + f->getName().str()) {
@@ -4855,7 +4853,7 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // legacy code - check LegacyskippedFunctions
     else if(interpreterOpts.skipMode == CHOP_LEGACY)
     {
-      for (auto i = interpreterOpts.skippedFunctions.begin(), e = interpreterOpts.skippedFunctions.end(); i != e; i++) {
+      for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
         if ((option.name == f->getName().str())) {
             Instruction *callInst = state.prevPC->inst;

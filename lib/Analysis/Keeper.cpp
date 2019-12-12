@@ -185,7 +185,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     if(fi->type == FunctionClass::SKIP)
       skippedTargets.push_back(fi->key);
     else if(fi->type == FunctionClass::AUTOKEEP || fi->type == FunctionClass::ANCESTOR) {
-      // autokeep: we have to add it to the skippedFunctions vectors
+      // autokeep: we have to add it to the selected functions vectors
       std::vector<unsigned int> empty_lines;
       functionsToKeep.push_back(Interpreter::SkippedFunctionOption(fi->key, empty_lines));
     }
