@@ -1016,7 +1016,7 @@ void externalsAndGlobalsCheck(const Module *m) {
                                  !dontCare.count(ext))) {
       if (unsafe.count(ext)) {
         foundUnsafe.insert(*it);
-      } else {
+      } else if(ext.find("__crit_") == std::string::npos) {
         klee_warning("undefined reference to %s: %s",
                      it->second ? "variable" : "function",
                      ext.c_str());
