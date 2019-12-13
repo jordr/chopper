@@ -1381,6 +1381,18 @@ void Executor::executeCall(ExecutionState &state,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
 
+  // JOR: debugging
+  std::string prefix;
+  for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
+  if(f) {
+    if(isFunctionToSkip(state, f))
+      klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
+    else
+      klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
+  }
+  else
+    klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
+
   if (f && PrintFunctionCalls)
     klee_message("Function: %s", f->getName().str().c_str());
 
@@ -1524,8 +1536,9 @@ void Executor::executeCall(ExecutionState &state,
     unsigned funcArgs = f->arg_size();
     if (!f->isVarArg()) {
       if (callingArgs > funcArgs) {
-        klee_warning_once(f, "calling %s with extra arguments.", 
-                          f->getName().data());
+        klee_warning_once(f, "calling %s with extra arguments. (from %s)", 
+                          f->getName().data(),
+                          state.stack[state.stack.size()-2].kf->function->getName().str().c_str());
       } else if (callingArgs < funcArgs) {
         terminateStateOnError(state, "calling function with too few arguments",
                               User);
@@ -1989,14 +2002,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       arguments.push_back(eval(ki, j+1, state).value);
 
     if (f) {
-      // JOR: debugging
-      std::string prefix;
-      for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
-      if(isFunctionToSkip(state, f))
-        klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
-      else
-        klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
-
       const FunctionType *fType = 
         dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
       const FunctionType *fpType =

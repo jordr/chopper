@@ -25,6 +25,8 @@ struct FunctionClass {
   int type;
   enum {
     NONE=0,
+    // this will be the sorting order
+    SPECIAL,
     LIBC,
     INTRINSIC,
     HIDDEN_VISIBILITY,
@@ -106,12 +108,6 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     FunctionClass funClass;
     funClass.type = FunctionClass::SKIP;
     funClass.key = (*i).getKey();
-    
-    for(klee::SpecialFunctionHandler::const_iterator sf = klee::SpecialFunctionHandler::begin(), se = klee::SpecialFunctionHandler::end(); sf != se; ++sf) {
-      if(strcmp(funClass.key.c_str(), sf->name) == 0) {
-        klee::klee_warning("Special function scanned: '%s', doesNotReturn=%d, hasReturnValue=%d", sf->name, sf->doesNotReturn, sf->hasReturnValue);
-      }
-    }
 
     for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
       if(i->name == funClass.key) {
@@ -120,7 +116,20 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       }
     }
 
-    if(autoKeep) {
+    { // JOR: getting the filename
+      llvm::DebugInfoFinder Finder;
+      Finder.processModule(*f->getParent());
+      for (llvm::DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
+        const llvm::MDNode* node = *Iter;
+        llvm::DISubprogram SP(node);
+        if (SP.describes(f)) {
+          funClass.filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
+          break;
+        }
+      }
+    }
+
+    if(autoKeep && funClass.type == FunctionClass::SKIP) {
       // autokeep includes ancestor lookup for now
       if(ancestors.find(f) != ancestors.end()) {
         funClass.type = FunctionClass::ANCESTOR;
@@ -133,28 +142,21 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::HIDDEN_VISIBILITY;
       }
+      else if(!funClass.type && funClass.filename.startswith(llvm::StringRef("libc/")))
+      {
+        funClass.type = FunctionClass::AUTOKEEP;
+        funClass.autokeepReason = FunctionClass::LIBC;
+      }
       // weak linkage
       // internal linkage
       // hasDLLExportLinkage || hasDLLImportLinkage
 
-      // llvm::StringRef filename;
-      { // JOR: getting the filename
-        llvm::DebugInfoFinder Finder;
-        Finder.processModule(*f->getParent());
-        for (llvm::DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
-          const llvm::MDNode* node = *Iter;
-          llvm::DISubprogram SP(node);
-          if (SP.describes(f)) {
-            funClass.filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
-            break;
-          }
+      for(klee::SpecialFunctionHandler::const_iterator sf = klee::SpecialFunctionHandler::begin(), se = klee::SpecialFunctionHandler::end(); sf != se; ++sf) {
+        if(strcmp(funClass.key.c_str(), sf->name) == 0) {
+          // klee::klee_warning("Special function scanned: '%s', doesNotReturn=%d, hasReturnValue=%d", sf->name, sf->doesNotReturn, sf->hasReturnValue);
+          funClass.type = FunctionClass::AUTOKEEP;
+          funClass.autokeepReason = FunctionClass::SPECIAL;
         }
-      }
-
-      if(!funClass.type && funClass.filename.startswith(llvm::StringRef("libc/")))
-      {
-        funClass.type = FunctionClass::AUTOKEEP;
-        funClass.autokeepReason = FunctionClass::LIBC;
       }
     }
     classifiedFunctions.push_back(funClass);
@@ -167,6 +169,9 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
 
     if(fi->type == FunctionClass::AUTOKEEP)
       switch(fi->autokeepReason) {
+        case FunctionClass::SPECIAL:
+          reasonStr = "(special)";
+          break;
         case FunctionClass::LIBC:
           reasonStr = "(libc)";
           break;
@@ -180,7 +185,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
           assert(false && "reason must be set for autokeep");
       }
 
-    klee::klee_message("\e[49m%s\e[0;m|%s '%s' %s",
+    klee::klee_message("\e[49m%s\e[0;m|%s %s %s",
       prettifyFileName(fi->filename).c_str(),
         (fi->type == FunctionClass::ANCESTOR ? "ANCESTOR|\e[0;32m" : 
         (fi->type == FunctionClass::AUTOKEEP ? "AUTOKEEP|\e[0;33m" : 
@@ -196,6 +201,10 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       functionsToKeep.push_back(Interpreter::SkippedFunctionOption(fi->key, empty_lines));
     }
   }
+  	
+  // Check that __user_main is kept
+  if(std::find(skippedTargets.begin(), skippedTargets.end(), "__user_main") != skippedTargets.end())
+    klee::klee_warning("\e[1;35mRoot function __user_main is skipped!\e[0;m");
 }
 
 std::string Keeper::prettifyFileName(llvm::StringRef filename) {
