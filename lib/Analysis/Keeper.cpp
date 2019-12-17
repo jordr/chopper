@@ -275,6 +275,13 @@ Keeper::ReverseReachability::createCallerTable (llvm::CallGraph & CG, const Func
     if(Caller == F)
       continue;
 
+    // If there is no called function, then this call can call code external
+    // to the module.  In that case, mark the call as incomplete.
+    if (!Caller) {
+      isComplete = false;
+      continue;
+    }
+
     // Iterate through all of the target call nodes and add them to the list of
     // targets to use in the global variable.
     // PointerType * VoidPtrType = ReverseReachability::getVoidPtrType(F->getContext());
@@ -286,12 +293,6 @@ Keeper::ReverseReachability::createCallerTable (llvm::CallGraph & CG, const Func
       if (Target != F)
         continue;
 
-      // If there is no called function, then this call can call code external
-      // to the module.  In that case, mark the call as incomplete.
-      if (!Caller) {
-        isComplete = false;
-        continue;
-      }
       //if(Target) klee::klee_message("\t Target = %s, Source = %s, F = %s", Target->getName().str().c_str(), Caller->getName().str().c_str(), F->getName().str().c_str());
 
       // Do not include intrinsic functions or functions that do not get
