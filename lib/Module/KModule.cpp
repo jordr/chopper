@@ -238,6 +238,7 @@ static void forceImport(Module *m, const char *name, LLVM_TYPE_Q Type *retType,
 }
 #endif
 
+
 void KModule::addInternalFunction(const char* functionName){
   Function* internalFunction = module->getFunction(functionName);
   if (!internalFunction) {
@@ -325,8 +326,6 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   // issue.
   pm.add(new IntrinsicCleanerPass(*targetData, false));
   pm.run(*module);
-
-  
 
   if (opts.Optimize)
     Optimize(module, opts.EntryPoint);

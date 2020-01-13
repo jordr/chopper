@@ -1713,7 +1713,6 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
-
   Instruction *i = ki->inst;
   /* TODO: replace with a better predicate (call stack counter?) */
   if (state.isRecoveryState() && state.getExitInst() == i) {
@@ -1723,13 +1722,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   switch (i->getOpcode()) {
     // Control flow
-  case Instruction::Ret: {    
+  case Instruction::Ret: {
     ReturnInst *ri = cast<ReturnInst>(i);
     KInstIterator kcaller = state.stack.back().caller;
     Instruction *caller = kcaller ? kcaller->inst : 0;
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
-
+    
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
     }
@@ -2343,9 +2342,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Store: {
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
-    // JOR
-    //klee_warning("\e[0;31mINSTRUCTION STORE, DUMPING STACK");
-    // state.dumpStack(llvm::errs());
     executeMemoryOperation(state, true, base, value, 0);
     break;
   }

@@ -93,12 +93,12 @@ void ModRefAnalysis::run() {
     computeModInfoToStoreMap();
 
     /* debug */
-    // dumpModSetMap();
-    // dumpDependentLoads();
-    // dumpLoadToModInfoMap();
-    // dumpModInfoToStoreMap();
-    // dumpModInfoToIdMap();
-    // dumpOverridingStores();
+    //dumpModSetMap();
+    //dumpDependentLoads();
+    //dumpLoadToModInfoMap();
+    //dumpModInfoToStoreMap();
+    //dumpModInfoToIdMap();
+    //dumpOverridingStores();
 }
 
 ModRefAnalysis::ModInfoToStoreMap &ModRefAnalysis::getModInfoToStoreMap() {

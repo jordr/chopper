@@ -1618,7 +1618,6 @@ int main(int argc, char **argv, char **envp) {
     interpreter->setReplayPath(&replayPath);
   }
 
-
   char buf[256];
   time_t t[2];
   t[0] = time(NULL);
