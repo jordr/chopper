@@ -3,7 +3,10 @@ Release+Asserts/
 Debug/
 Debug+Asserts/
 Output/
+
 build/
+include/.vscode/
+scripts/__pycache__/
 
 cscope.*
 *~
