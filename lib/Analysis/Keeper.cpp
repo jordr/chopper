@@ -79,15 +79,18 @@ void Keeper::generateAncestors(std::set<const Function*>& ancestors) {
   // pm.run(*module);
 
   klee::klee_message("Seeking ancestors of selected functions...");
+  // for each f in the symbol table
   for(llvm::ValueSymbolTable::iterator i = module->getValueSymbolTable().begin(); i != module->getValueSymbolTable().end(); i++) {
     llvm::Value* v_fun = (*i).getValue();
     const llvm::StringRef k_fun = (*i).getKey();
     Function* f = llvm::dyn_cast_or_null<Function>((v_fun));
     if(!f)
       continue;
+
     for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
+      // for each manually selected function
       if(i->name == k_fun) {
-        // We found a manually selected function
+        // if it matches f, add all the ancestors of f
         const std::set<const llvm::Function*>& ancestorsOfF = ReverseReachability::buildReverseReachabilityMap(*CG, f);
         for(auto ci = ancestorsOfF.begin(); ci != ancestorsOfF.end(); ci++) {
           ancestors.insert(*ci);
@@ -254,22 +257,29 @@ Keeper::ReverseReachability::buildReverseReachabilityMap(llvm::CallGraph & CG, F
   // SmallVector<Function *, 40> Ancestors;
   std::set<const Function*> Ancestors;
   llvm::SmallVector<const Function*, 20> wl;
+  // start off with {F}
   wl.push_back(F);
   while(! wl.empty()) {
+    // for each fun in the working list
     bool isComplete;
     const Function* fun = wl.pop_back_val();
     const llvm::SmallVector<const Function *, 20>& callers = createCallerTable(CG, fun, isComplete);
+ 
+    // for each caller of fun
     for(auto ci = callers.begin(); ci != callers.end(); ci++) {
-      if(*ci != F) {
-        klee::klee_message("\t-Ancestor: '%s' (calls '%s')", 
-          (*ci)->getName().str().c_str(),
-          fun->getName().str().c_str());
+      if(*ci != F) { // useless check?
+        // if we do not already know about this caller
         if(Ancestors.find(*ci) == Ancestors.end())
-          // if we do not already know about this parent
-          wl.push_back(*ci);
-        Ancestors.insert(callers.begin(), callers.end());
+        {
+          klee::klee_message("\t-Ancestor: '%s' (calls '%s')", (*ci)->getName().str().c_str(), fun->getName().str().c_str());
+          wl.push_back(*ci); // add it to the wl
+        }
       }
     }
+
+    // add the callers to the ancestors table
+    Ancestors.insert(callers.begin(), callers.end());
+    
     // assert(isComplete); //TODO: JOR: investigate?
   }
 
