@@ -1385,7 +1385,7 @@ void Executor::executeCall(ExecutionState &state,
   std::string prefix;
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
   if(f) {
-    if(isFunctionToSkip(state, f))
+    if(!state.isRecoveryState() && isFunctionToSkip(state, f))
       klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
     else
       klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
@@ -4821,45 +4821,18 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     if(interpreterOpts.skipMode == CHOP_KEEP)
     {
       bool skipped = true;
-      //JOR: this seems to parse wrappers only, so only skipped functions?
+      if(f->getName().startswith(llvm::StringRef("klee_"))) // JOR: TODO: move to proper function
+        skipped = false;
+      // klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str());
       DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str()));
       for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
-          const SkippedFunctionOption &option = *i;
-          // klee_warning_once(option.name.c_str(), "SkippedFunctionOption = %s", option.name.c_str());
-          if (option.name == "" + f->getName().str()) {
+          if ((*i).name == f->getName().str()) {
             skipped = false;
             break;
           }
-      }/* 
-      if(f->getName().str().find("__uClibc") == 0) // JOR: hax
-      {
-          klee_warning("Not skipping uclibc function");
-          skipped = false;
-      } */
-      if (skipped) {
-          // Instruction *callInst = state.prevPC->inst;
-          // const InstructionInfo &info = kmodule->infos->getInfo(callInst);
-          // const std::vector<unsigned int> &lines = option.lines;
-
-          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\tskipping all calls to: %s", f->getName().str().data()));
-          /* skip any call site */
-          // if (lines.empty()) {
-          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("                          ...YES"));
-          return true;
-          // }
-  #if 0
-
-          /* check if we have debug information */
-          if (info.line == 0) {
-              klee_warning_once(0, "call filter for %s: debug info not found...", f->getName().str().data());
-              return true;
-          }
-
-          return std::find(lines.begin(), lines.end(), info.line) != lines.end();
-  #endif
-        }
-
-      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("                          ...NO"));
+      }
+      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message(skipped ? "                          ...YES" : "                          ...NO"));
+      return skipped;
     }
     // legacy code - check LegacyskippedFunctions
     else if(interpreterOpts.skipMode == CHOP_LEGACY)
@@ -4885,8 +4858,10 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
             return std::find(lines.begin(), lines.end(), info.line) != lines.end();
         }
       }
+      return false;
     }
-    return false;
+    else
+      return false;
 }
 
 void Executor::bindAll(ExecutionState *state, MemoryObject *mo, bool isLocal, bool zeroMemory) {

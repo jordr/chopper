@@ -30,6 +30,8 @@ struct FunctionClass {
     LIBC,
     INTRINSIC,
     HIDDEN_VISIBILITY,
+    KLEE,
+    SYSTEM,
   };
   int autokeepReason;
   std::string key;
@@ -142,10 +144,18 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::HIDDEN_VISIBILITY;
       }
-      else if(!funClass.type && funClass.filename.startswith(llvm::StringRef("libc/")))
-      {
+      else if(!funClass.type && funClass.filename.startswith(llvm::StringRef("libc/"))) {
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::LIBC;
+      }
+      //else if(kmodule->internalFunctions.count(f)) {
+      else if(f->getName().startswith(llvm::StringRef("klee_"))) { // JOR: TODO: this is hacky, can we use the above + something for klee_init_env and others?
+        funClass.type = FunctionClass::AUTOKEEP;
+        funClass.autokeepReason = FunctionClass::KLEE;
+      }
+      else if(f->getName().str() == "syscall" || f->getName().str() == "open" || f->getName().str() == "close") {
+        funClass.type = FunctionClass::AUTOKEEP;
+        funClass.autokeepReason = FunctionClass::SYSTEM;
       }
       // weak linkage
       // internal linkage
@@ -181,6 +191,12 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         case FunctionClass::INTRINSIC:
           reasonStr = "(intrinsic)";
           break;
+        case FunctionClass::KLEE:
+          reasonStr = "(KLEE)";
+          break;
+        case FunctionClass::SYSTEM:
+          reasonStr = "(system)";
+          break;
         default:
           assert(false && "reason must be set for autokeep");
       }
@@ -204,7 +220,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
   	
   // Check that __user_main is kept
   if(std::find(skippedTargets.begin(), skippedTargets.end(), "__user_main") != skippedTargets.end())
-    klee::klee_warning("\e[1;35mRoot function __user_main is skipped!\e[0;m");
+    klee::klee_error("\e[1;35mRoot function __user_main is skipped!\e[0;m");
 }
 
 std::string Keeper::prettifyFileName(llvm::StringRef filename) {
