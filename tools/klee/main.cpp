@@ -1290,8 +1290,8 @@ void parseSkippingParameter(
         }
 
 		if (!f->getReturnType()->isVoidTy()) {
-      if(addWrap)
-		    fname = std::string("__wrap_") + fname; // JOR
+      if(addWrap) // JOR
+		    fname = std::string("__wrap_") + fname;
 		}
         result.push_back(Interpreter::SkippedFunctionOption(fname, lines));
     }
@@ -1531,7 +1531,7 @@ int main(int argc, char **argv, char **envp) {
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
   Interpreter::SkipMode skipMode;
   parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
-  parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy, true);
+  parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy, true); // this adds __wrap
   if(!skippingOptionsNot.empty() && !skippingOptionsLegacy.empty())
     klee_error("Cannot specify both --skip-functions-legacy and --skip-functions-not.");
   else if(!skippingOptionsLegacy.empty())

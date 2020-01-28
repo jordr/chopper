@@ -36,6 +36,7 @@ struct FunctionClass {
   int autokeepReason;
   std::string key;
   llvm::StringRef filename;
+  bool isVoidFunction; // the only use of this is to append __wrap_
 
   FunctionClass() : type(INVALID), autokeepReason(NONE) { }
   bool operator<(const FunctionClass& fc) {
@@ -113,6 +114,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     FunctionClass funClass;
     funClass.type = FunctionClass::SKIP;
     funClass.key = (*i).getKey();
+    funClass.isVoidFunction = f->getReturnType()->isVoidTy();
 
     for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
       if(i->name == funClass.key) {
@@ -212,8 +214,11 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       fi->key.c_str(),
       reasonStr);
 
-    if(fi->type == FunctionClass::SKIP)
-      skippedTargets.push_back(fi->key);
+    if(fi->type == FunctionClass::SKIP) {
+      // if this was CHOP_LEGACY mode, the __wrap_ prefix would already be put in main.cpp, but with CHOP_KEEP we only put it now
+      std::string fname = fi->isVoidFunction ? fi->key : std::string("__wrap_") + fi->key;
+      skippedTargets.push_back(fname);
+    }
     else if(fi->type == FunctionClass::AUTOKEEP || fi->type == FunctionClass::ANCESTOR) {
       // autokeep: we have to add it to the selected functions vectors
       std::vector<unsigned int> empty_lines;

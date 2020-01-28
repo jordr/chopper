@@ -20,7 +20,10 @@ public:
         : module(module), skipMode(skipMode), functionsToKeep(functionsToKeep), autoKeep(autoKeep), debugs(debugs) {}
 
   void run();
-  inline std::vector<std::string>& getSkippedTargets() { return skippedTargets; }
+  inline std::vector<std::string>& getSkippedTargets() 
+    { return skippedTargets; }
+  inline bool isFunctionToSkip(llvm::StringRef fname) const
+    { return std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) != skippedTargets.end(); }
 
 private:
   void generateAncestors(std::set<const llvm::Function*>& ancestors);

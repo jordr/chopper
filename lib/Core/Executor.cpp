@@ -466,6 +466,7 @@ const Module *Executor::setModule(llvm::Module *module,
     /* build target functions */
     std::vector<std::string> skippedTargets;
     keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
+
     keeper->run();
     skippedTargets = keeper->getSkippedTargets();
 
@@ -481,6 +482,7 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
+  // calls ReturnToVoidFunctionPass with (interpreterOpts.skipMode, interpreterOpts.selectedFunctions)
   kmodule->prepare(opts, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
@@ -4820,19 +4822,17 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // check NotskippedFunctions
     if(interpreterOpts.skipMode == CHOP_KEEP)
     {
-      bool skipped = true;
-      if(f->getName().startswith(llvm::StringRef("klee_"))) // JOR: TODO: move to proper function
-        skipped = false;
-      // klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str());
-      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message("isFunctionToSkip(f= \e[0;96m%s\e[0;m)...", f->getName().str().c_str()));
+      // if(f->getName().startswith(llvm::StringRef("klee_"))) // JOR: TODO: move to proper function
+      //   skipped = false;
+      /*
       for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
           if ((*i).name == f->getName().str()) {
-            skipped = false;
-            break;
+            return false;
           }
       }
-      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_message(skipped ? "                          ...YES" : "                          ...NO"));
-      return skipped;
+      return true;
+      //*/
+      return keeper->isFunctionToSkip(f->getName());
     }
     // legacy code - check LegacyskippedFunctions
     else if(interpreterOpts.skipMode == CHOP_LEGACY)
