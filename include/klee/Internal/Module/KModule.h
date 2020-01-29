@@ -13,6 +13,7 @@
 #include "klee/Config/Version.h"
 #include "klee/Interpreter.h"
 
+#include "klee/Internal/Analysis/Keeper.h"
 #include "klee/Internal/Analysis/ReachabilityAnalysis.h"
 #include "klee/Internal/Analysis/Inliner.h"
 #include "klee/Internal/Analysis/AAPass.h"
@@ -134,8 +135,9 @@ namespace klee {
     //
     // FIXME: ihandler should not be here
     void prepare(const Interpreter::ModuleOptions &opts,
-                 Interpreter::SkipMode skipMode,
-                 const std::vector<Interpreter::SkippedFunctionOption> &skippedFunctions,
+                //  Interpreter::SkipMode skipMode,
+                //  const std::vector<Interpreter::SkippedFunctionOption> &skippedFunctions,
+                 Keeper* keeper,
                  InterpreterHandler *ihandler,
                  ReachabilityAnalysis *ra,
                  Inliner *inliner,

@@ -466,7 +466,6 @@ const Module *Executor::setModule(llvm::Module *module,
     /* build target functions */
     std::vector<std::string> skippedTargets;
     keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
-
     keeper->run();
     skippedTargets = keeper->getSkippedTargets();
 
@@ -482,8 +481,8 @@ const Module *Executor::setModule(llvm::Module *module,
     }
   }
 
-  // calls ReturnToVoidFunctionPass with (interpreterOpts.skipMode, interpreterOpts.selectedFunctions)
-  kmodule->prepare(opts, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  // calls ReturnToVoidFunctionPass with (keeper.skipMode, keeper.selectedFunctions)
+  kmodule->prepare(opts, keeper, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -1388,12 +1387,12 @@ void Executor::executeCall(ExecutionState &state,
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
   if(f) {
     if(!state.isRecoveryState() && isFunctionToSkip(state, f))
-      klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
+      /* DEBUG_WITH_TYPE("calls",  */klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str())/* ) */;
     else
-      klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
+      /* DEBUG_WITH_TYPE("calls",  */klee_message("%s %s", prefix.c_str(), f->getName().str().c_str())/* ) */;
   }
   else
-    klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
+    /* DEBUG_WITH_TYPE("calls",  */klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str())/* ) */;
 
   if (f && PrintFunctionCalls)
     klee_message("Function: %s", f->getName().str().c_str());
@@ -4167,7 +4166,7 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
   std::string prefix;
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
   for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++) {
-    klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());//, state.stack.back().kf->function->getName().str().c_str());
+    DEBUG_WITH_TYPE("calls", klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str()));//, state.stack.back().kf->function->getName().str().c_str());
   }
 
   /* TODO: move to another place? */

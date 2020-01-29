@@ -3,6 +3,7 @@
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "klee/Interpreter.h"
 #include "klee/Internal/Analysis/Keeper.h"
 #include "klee/Internal/Support/ErrorHandling.h"
@@ -56,7 +57,7 @@ struct FunctionClass {
 
 void Keeper::run() {
   if (skipMode == Interpreter::CHOP_LEGACY) {
-    for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
+    for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++) {
       skippedTargets.push_back(i->name);
     }
   }
@@ -88,7 +89,7 @@ void Keeper::generateAncestors(std::set<const Function*>& ancestors) {
     if(!f)
       continue;
 
-    for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
+    for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++) {
       // for each manually selected function
       if(i->name == k_fun) {
         // if it matches f, add all the ancestors of f
@@ -116,7 +117,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     funClass.key = (*i).getKey();
     funClass.isVoidFunction = f->getReturnType()->isVoidTy();
 
-    for (auto i = functionsToKeep.begin(), e = functionsToKeep.end(); i != e; i++) {
+    for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++) {
       if(i->name == funClass.key) {
         funClass.type = FunctionClass::SELECTED;
         break;
@@ -153,8 +154,8 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::LIBC;
       }
-      //else if(kmodule->internalFunctions.count(f)) {
-      else if(f->getName().startswith(llvm::StringRef("klee_"))) { // JOR: TODO: this is hacky, can we use the above + something for klee_init_env and others?
+      // JOR: TODO: this is hacky, can we use the above + something for klee_init_env and others?
+      else if(f->getName().startswith(llvm::StringRef("klee_")) || f->getName().str() == "__fd_stat") {
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::KLEE;
       }
@@ -162,6 +163,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::SYSTEM;
       }
+      //else if(kmodule->internalFunctions.count(f)) {
       // weak linkage
       // internal linkage
       // hasDLLExportLinkage || hasDLLImportLinkage
@@ -179,6 +181,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
 
   /* Display and write functions */
   sort(classifiedFunctions.begin(), classifiedFunctions.end()); // sort for display
+  std::string legacyEquivalentCmd;
   for(auto fi = classifiedFunctions.begin(); fi != classifiedFunctions.end(); fi++) {
     const char* reasonStr = "";
 
@@ -205,14 +208,21 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         default:
           assert(false && "reason must be set for autokeep");
       }
+    
+    if(fi->type == FunctionClass::SKIP) {
+      if(legacyEquivalentCmd.empty())
+        legacyEquivalentCmd += fi->key;
+      else
+        legacyEquivalentCmd += "," + fi->key;
+    }
 
-    klee::klee_message("\e[49m%s\e[0;m|%s %s %s",
+    DEBUG_WITH_TYPE("chop", klee::klee_message("\e[49m%s\e[0;m|%s %s %s",
       prettifyFileName(fi->filename).c_str(),
         (fi->type == FunctionClass::ANCESTOR ? "ANCESTOR|\e[0;32m" : 
         (fi->type == FunctionClass::AUTOKEEP ? "AUTOKEEP|\e[0;33m" : 
         (fi->type == FunctionClass::SKIP ? "SKIP    |\e[0;31m" : "KEEP    |\e[0;92m"))),
       fi->key.c_str(),
-      reasonStr);
+      reasonStr));
 
     if(fi->type == FunctionClass::SKIP) {
       // if this was CHOP_LEGACY mode, the __wrap_ prefix would already be put in main.cpp, but with CHOP_KEEP we only put it now
@@ -222,9 +232,11 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     else if(fi->type == FunctionClass::AUTOKEEP || fi->type == FunctionClass::ANCESTOR) {
       // autokeep: we have to add it to the selected functions vectors
       std::vector<unsigned int> empty_lines;
-      functionsToKeep.push_back(Interpreter::SkippedFunctionOption(fi->key, empty_lines));
+      selectedFunctions.push_back(Interpreter::SkippedFunctionOption(fi->key, empty_lines));
     }
   }
+
+  klee::klee_message("Equivalent legacy command:  --skip-functions-legacy=%s", legacyEquivalentCmd.c_str());
   	
   // Check that __user_main is kept
   if(std::find(skippedTargets.begin(), skippedTargets.end(), "__user_main") != skippedTargets.end())
@@ -276,7 +288,7 @@ Keeper::ReverseReachability::buildReverseReachabilityMap(llvm::CallGraph & CG, F
         // if we do not already know about this caller
         if(Ancestors.find(*ci) == Ancestors.end())
         {
-          klee::klee_message("\t-Ancestor: '%s' (calls '%s')", (*ci)->getName().str().c_str(), fun->getName().str().c_str());
+          DEBUG_WITH_TYPE("chop", klee::klee_message("\t-Ancestor: '%s' (calls '%s')", (*ci)->getName().str().c_str(), fun->getName().str().c_str()));
           wl.push_back(*ci); // add it to the wl
         }
       }

@@ -11,6 +11,7 @@
 
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/Internal/Analysis/Keeper.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/CFG.h"
@@ -46,11 +47,11 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   if(skipMode == Interpreter::CHOP_KEEP)
   {
     bool isSkipped = true; //JOR
-    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
-      if (string("__wrap_") + f.getName().str() == i->name || f.getName().str() == i->name) {
+    for (std::vector<std::string>::const_iterator i = skippedTargets.begin(); i != skippedTargets.end(); i++) {
+      if (string("__wrap_") + f.getName().str() == (*i) || f.getName().str() == (*i)) {
         isSkipped = false; 
-        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tNot voiding %s", i->name.c_str()));
-        DEBUG_WITH_TYPE("temp1", klee_warning("\tNot voiding %s", i->name.c_str()));
+        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tNot voiding %s", (*i).c_str()));
+        DEBUG_WITH_TYPE("temp1", klee_warning("\tNot voiding %s", (*i).c_str()));
         break;
       }
     }
@@ -66,7 +67,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   else if(skipMode == Interpreter::CHOP_LEGACY)
   {
     // legacy code
-    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
+    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = selectedFunctionsLegacy.begin(); i != selectedFunctionsLegacy.end(); i++) {
       if (string("__wrap_") + f.getName().str() == i->name) {
         Function *wrapper = createWrapperFunction(f, module);
         replaceCalls(&f, wrapper, i->lines);

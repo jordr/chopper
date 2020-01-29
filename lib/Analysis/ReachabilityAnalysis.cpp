@@ -107,10 +107,9 @@ bool ReachabilityAnalysis::run(bool usePA) {
       // errs() << "function '" << name << "' is not found\n";
       // return false;
       // JOR don't return here, treat this as non-critical
-      klee::klee_warning("[ReachabilityAnalysis] function '%s' is not found", name.c_str());
+      DEBUG_WITH_TYPE("chop", klee::klee_warning("[ReachabilityAnalysis] function '%s' is not found", name.c_str()));
       continue;
     }
-    //targetFunctions.push_back(f); //JOR: this is useless??
     all.push_back(f);
   }
 
