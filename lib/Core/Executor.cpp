@@ -1388,7 +1388,7 @@ void Executor::executeCall(ExecutionState &state,
   if(f) {
     if(!state.isRecoveryState() && isFunctionToSkip(state, f))
       /* DEBUG_WITH_TYPE("calls",  */klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str())/* ) */;
-    else
+    else if(!state.isRecoveryState()) // JOR: actually, let's remove recovery detailed messages for now
       /* DEBUG_WITH_TYPE("calls",  */klee_message("%s %s", prefix.c_str(), f->getName().str().c_str())/* ) */;
   }
   else
@@ -4166,7 +4166,7 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
   std::string prefix;
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
   for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++) {
-    DEBUG_WITH_TYPE("calls", klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str()));//, state.stack.back().kf->function->getName().str().c_str());
+    klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());//, state.stack.back().kf->function->getName().str().c_str());
   }
 
   /* TODO: move to another place? */
