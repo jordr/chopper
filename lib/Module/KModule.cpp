@@ -317,7 +317,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   // optimize is seeing what is as close as possible to the final
   // module.
   PassManager pm;
-  pm.add(new ReturnToVoidFunctionPass(keeper->getSkipMode(), keeper->getSkippedTargets(), keeper->getLegacySelectedFunctions()));
+  pm.add(new ReturnToVoidFunctionPass(keeper->getSkipMode(), keeper->getSkippedFunctions()));
   pm.add(new RaiseAsmPass());
   if (opts.CheckDivZero) pm.add(new DivCheckPass());
   if (opts.CheckOvershift) pm.add(new OvershiftCheckPass());

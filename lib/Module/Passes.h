@@ -185,18 +185,18 @@ private:
 class ReturnToVoidFunctionPass : public llvm::ModulePass {
   static char ID;
   Interpreter::SkipMode skipMode; // JOR: TODO: put the SkipMode type somewhere accessible from here
-  const std::vector<std::string> skippedTargets;
-  const std::vector<Interpreter::SkippedFunctionOption> selectedFunctionsLegacy;
+  // const std::vector<std::string> skippedTargets;
+  const std::vector<Interpreter::SkippedFunctionOption>& skippedFunctions;
 
 public:
   ReturnToVoidFunctionPass(
       Interpreter::SkipMode _skipMode,
-      const std::vector<std::string> _skippedTargets,
-      const std::vector<Interpreter::SkippedFunctionOption> _selectedFunctionsLegacy) :
+      // const std::vector<std::string> _skippedTargets,
+      const std::vector<Interpreter::SkippedFunctionOption>& skippedFunctions) :
     ModulePass(ID),
     skipMode(_skipMode),
-    skippedTargets(_skippedTargets),
-    selectedFunctionsLegacy(_selectedFunctionsLegacy) // JOR: TODO!! clean this up!
+    // skippedTargets(_skippedTargets),
+    skippedFunctions(skippedFunctions)
   {
     
   }

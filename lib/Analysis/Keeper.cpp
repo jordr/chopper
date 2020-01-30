@@ -57,14 +57,19 @@ struct FunctionClass {
 
 void Keeper::run() {
   if (skipMode == Interpreter::CHOP_LEGACY) {
-    for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++) {
+    skippedFunctions = selectedFunctions;
+    // JOR: TODO: get rid of this ---v
+    for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++)
       skippedTargets.push_back(i->name);
-    }
   }
   else if(skipMode == Interpreter::CHOP_KEEP) {
     std::set<const Function*> ancestors;
     generateAncestors(ancestors);
     generateSkippedTargets(ancestors);
+    for (auto i = skippedTargets.begin(), e = skippedTargets.end(); i != e; i++) {
+      std::vector<unsigned int> empty_lines;
+      skippedFunctions.push_back(Interpreter::SkippedFunctionOption(*i, empty_lines));
+    }
   }
   else {
     // do nothing

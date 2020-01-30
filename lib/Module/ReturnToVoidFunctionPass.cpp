@@ -31,48 +31,19 @@ using namespace std;
 char klee::ReturnToVoidFunctionPass::ID = 0;
 
 bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) {
-  // assert(skipMode);
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("BEGIN ReturnToVoidFunctionPass.runOnFunction(%s)", f.getName().str().c_str()));
   // don't check void functions
   if (f.getReturnType()->isVoidTy()) {
-    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tisVoid: %s", f.getName().str().c_str()));
-    DEBUG_WITH_TYPE("temp1", klee_warning("\tisVoid: %s", f.getName().str().c_str()));
-    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
     return false;
   }
   
   bool changed = false;
-  
-  // JOR: TODO: fix this hack and include the SkipMode enum definition  
-  if(skipMode == Interpreter::CHOP_KEEP)
-  {
-    bool isSkipped = true; //JOR
-    for (std::vector<std::string>::const_iterator i = skippedTargets.begin(); i != skippedTargets.end(); i++) {
-      if (string("__wrap_") + f.getName().str() == (*i) || f.getName().str() == (*i)) {
-        isSkipped = false; 
-        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tNot voiding %s", (*i).c_str()));
-        DEBUG_WITH_TYPE("temp1", klee_warning("\tNot voiding %s", (*i).c_str()));
-        break;
-      }
-    }
-    if(isSkipped) {
-      DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\tVoiding %s", f.getName().str().c_str()));
+  for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
+    if (string("__wrap_") + f.getName().str() == i->name) {
       Function *wrapper = createWrapperFunction(f, module);
-      std::vector<unsigned int> empty_lines;
-      replaceCalls(&f, wrapper, empty_lines);
+      assert((skipMode != Interpreter::CHOP_KEEP || i->lines.empty()) && "TODO: treat the case where lines aren't empty");
+      replaceCalls(&f, wrapper, i->lines);
       changed = true;
-    }
-    DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("END ReturnToVoidFunctionPass"));
-  }
-  else if(skipMode == Interpreter::CHOP_LEGACY)
-  {
-    // legacy code
-    for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = selectedFunctionsLegacy.begin(); i != selectedFunctionsLegacy.end(); i++) {
-      if (string("__wrap_") + f.getName().str() == i->name) {
-        Function *wrapper = createWrapperFunction(f, module);
-        replaceCalls(&f, wrapper, i->lines);
-        changed = true;
-      }
     }
   }
 

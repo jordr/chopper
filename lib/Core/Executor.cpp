@@ -4819,8 +4819,7 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     // check NotskippedFunctions
-    if(interpreterOpts.skipMode == CHOP_KEEP)
-    {
+    if(interpreterOpts.skipMode == CHOP_KEEP) {
       // if(f->getName().startswith(llvm::StringRef("klee_"))) // JOR: TODO: move to proper function
       //   skipped = false;
       /*
@@ -4834,8 +4833,7 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
       return keeper->isFunctionToSkip(f->getName());
     }
     // legacy code - check LegacyskippedFunctions
-    else if(interpreterOpts.skipMode == CHOP_LEGACY)
-    {
+    else if(interpreterOpts.skipMode == CHOP_LEGACY) {
       for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
         if ((option.name == f->getName().str())) {
