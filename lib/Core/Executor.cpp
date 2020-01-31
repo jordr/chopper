@@ -1388,7 +1388,7 @@ void Executor::executeCall(ExecutionState &state,
   if(f) {
     if(!state.isRecoveryState() && isFunctionToSkip(state, f))
       /* DEBUG_WITH_TYPE("calls",  */klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str())/* ) */;
-    else if(!state.isRecoveryState()) // JOR: actually, let's remove recovery detailed messages for now
+    else //if(!state.isRecoveryState()) // JOR: actually, let's remove recovery detailed messages for now
       /* DEBUG_WITH_TYPE("calls",  */klee_message("%s %s", prefix.c_str(), f->getName().str().c_str())/* ) */;
   }
   else
