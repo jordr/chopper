@@ -54,9 +54,6 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
 ///  1- takes as first argument a variable __result that will contain the result
 ///  2- calls f and stores the return value in __result
 Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Module &module) {
-  // JOR
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t createWrapperFunction(f=%s)", f.getName().str().c_str()));
-
   // create new function parameters: *return_var + original function's parameters
   vector<Type *> paramTypes;
   Type *returnType = f.getReturnType();
@@ -79,31 +76,36 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
   Function::arg_iterator i = wrapper->arg_begin();
   Value *resultArg = i++;
   resultArg->setName("__result");
+  if (f.isVarArg()) {
+    Value *vaargscountArg = i++;
+    vaargscountArg->setName("__vaargs_count");
+  }
   for (Function::arg_iterator j = f.arg_begin(); j != f.arg_end(); j++) {
     Value *origArg = j;
     Value *arg = i++;
     arg->setName(origArg->getName());
     argsForCall.push_back(arg);
   }
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Set the arguments"));
 
   // create basic block 'entry' in the new function
   BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
   IRBuilder<> builder(block);
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Create BB entry"));
 
   // insert call to the original function
-  Type *VAListTy = StructType::create(
-    {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt8PtrTy(), builder.getInt8PtrTy});
-  Function *VAStart = Intrinsic::getDeclaration(f.getParent(), Intrinsic::vastart, {builder.getInt8PtrTy()});
   if (f.isVarArg()) {
+    Type *VAListTy = StructType::create(
+      {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt8PtrTy(), builder.getInt8PtrTy()});
+    Function *VAStart = Intrinsic::getDeclaration(f.getParent(), Intrinsic::vastart, {builder.getInt8PtrTy()});
+    Function *VAEnd = Intrinsic::getDeclaration(f.getParent(), Intrinsic::vaend, {builder.getInt8PtrTy()});
+    // ```va_start(list, lastvar);```
     Value *VAListTag = builder.CreateAlloca(VAListTy, builder.getInt32(1), "va_list_tag");
     Value *DecayedVAListtag = builder.CreateBitCast(VAListTag, builder.getInt8PtrTy());
     builder.CreateCall(VAStart, {DecayedVAListtag});
-    // Load the second argument call it n
-    // Call va_arg n times and push the returned value into argsForCall
+    // TODO: Load the second argument call it n
+    // TODO: Call va_arg n times and push the returned value into argsForCall
+    
     // Call va_end with VAListTag
-
+    builder.CreateCall(VAEnd, {DecayedVAListtag});
     // TODO chqnge where it is called to include __vaargs_count as a second argu;ent
   }
   Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
