@@ -1388,7 +1388,7 @@ void Executor::executeCall(ExecutionState &state,
   if(f) {
     if(!state.isRecoveryState() && isFunctionToSkip(state, f))
       /* DEBUG_WITH_TYPE("calls",  */klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str())/* ) */;
-    else if(!state.isRecoveryState()) // JOR: actually, let's remove recovery detailed messages for now
+    else //if(!state.isRecoveryState()) // JOR: actually, let's remove recovery detailed messages for now
       /* DEBUG_WITH_TYPE("calls",  */klee_message("%s %s", prefix.c_str(), f->getName().str().c_str())/* ) */;
   }
   else
@@ -1409,9 +1409,14 @@ void Executor::executeCall(ExecutionState &state,
     case Intrinsic::vastart:  {
       StackFrame &sf = state.stack.back();
 
+      klee_message("\e[0;32mWEEOOOO: Entering vaargs case");
       // varargs can be zero if no varargs were provided
       if (!sf.varargs)
         return;
+      
+      klee_message("\e[0;31m WEEEEE: %d \e[0;m", sf.varargs->size);
+      state.dumpStack(llvm::errs()); // JOR:
+      // assert(false);
 
       // FIXME: This is really specific to the architecture, not the pointer
       // size. This happens to work fir x86-32 and x86-64, however.
@@ -3750,6 +3755,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
+      target->getOrigInst()->print(errs());
+      assert(false);
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
     }
@@ -4167,6 +4174,8 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
   for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++) {
     klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());//, state.stack.back().kf->function->getName().str().c_str());
+    // lord:
+    klee_message("\e[31m%d\e[0;m ", (*i)->loadSize);
   }
 
   /* TODO: move to another place? */
