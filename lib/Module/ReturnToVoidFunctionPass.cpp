@@ -63,6 +63,10 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
   
   assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type");
   paramTypes.push_back(PointerType::get(returnType, 0));
+  // If f is a variadic function make the second argument the number of variable arguments
+  if (f.isVarArg()) {
+    paramTypes.push_back(Type::getInt32Ty(f.getParent()->getContext()));
+  }
   paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
   
   // create new void function
@@ -89,6 +93,19 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Create BB entry"));
 
   // insert call to the original function
+  Type *VAListTy = StructType::create(
+    {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt8PtrTy(), builder.getInt8PtrTy});
+  Function *VAStart = Intrinsic::getDeclaration(f.getParent(), Intrinsic::vastart, {builder.getInt8PtrTy()});
+  if (f.isVarArg()) {
+    Value *VAListTag = builder.CreateAlloca(VAListTy, builder.getInt32(1), "va_list_tag");
+    Value *DecayedVAListtag = builder.CreateBitCast(VAListTag, builder.getInt8PtrTy());
+    builder.CreateCall(VAStart, {DecayedVAListtag});
+    // Load the second argument call it n
+    // Call va_arg n times and push the returned value into argsForCall
+    // Call va_end with VAListTag
+
+    // TODO chqnge where it is called to include __vaargs_count as a second argu;ent
+  }
   Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
   // insert store for the return value to __result parameter
   builder.CreateStore(callInst, resultArg);
