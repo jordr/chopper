@@ -3756,7 +3756,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
       target->getOrigInst()->print(errs());
-      assert(false);
+      // assert(false);
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
     }

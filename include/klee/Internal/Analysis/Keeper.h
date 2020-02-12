@@ -30,7 +30,9 @@ public:
   inline const std::vector<std::string>& getSkippedTargets() const
     { return skippedTargets; }
   inline bool isFunctionToSkip(llvm::StringRef fname) const
-    { return std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) != skippedTargets.end(); }
+   { return fname.startswith(llvm::StringRef("__wrap_")) // for variadics
+   || std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) != skippedTargets.end(); }
+  // JOR: TODO: make isFunctionToSkip pretty again
     
 private:
   void generateAncestors(std::set<const llvm::Function*>& ancestors);

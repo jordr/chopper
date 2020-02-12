@@ -41,12 +41,12 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
       assert((skipMode != Interpreter::CHOP_KEEP || i->lines.empty()) && "TODO: treat the case where lines aren't empty");
-      if(!f.isVarArg()) {
-        Function *wrapper = createWrapperFunction(f, module);
-        replaceCalls(&f, wrapper, i->lines);
+      if(skipMode == Interpreter::CHOP_KEEP && f.isVarArg()) { // JOR: TODO: this should be for any skipMode, do it when the variadic stuff is clean
+        replaceVariadicCalls(&f, i->lines, module);
       }
       else {
-        replaceVariadicCalls(&f, i->lines, module);
+        Function *wrapper = createWrapperFunction(f, module);
+        replaceCalls(&f, wrapper, i->lines);
       }
       changed = true;
     }
@@ -186,7 +186,6 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
   assert(f.isVarArg());
   const int totalArgCount = call->getNumArgOperands();
   const int totalStaticArgCount = f.getFunctionType()->getNumParams();
-  const AttributeSet& attributes = call->getAttributes();
 
   // JOR: TODO add the attributes to argsForCall
   // JOR: TODO add the attributes to wrapper paramTypes

@@ -170,10 +170,10 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::SYSTEM;
       }
-      else if (f->hasInternalLinkage()) {
-        funClass.type = FunctionClass::AUTOKEEP;
-        funClass.autokeepReason = FunctionClass::OTHER;
-      }
+      // else if (f->hasInternalLinkage()) {
+      //   funClass.type = FunctionClass::AUTOKEEP;
+      //   funClass.autokeepReason = FunctionClass::OTHER;
+      // }
       //else if(kmodule->internalFunctions.count(f)) {
       // weak linkage
       // internal linkage
