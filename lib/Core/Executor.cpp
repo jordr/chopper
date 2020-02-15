@@ -1386,15 +1386,16 @@ void Executor::executeCall(ExecutionState &state,
   std::string prefix;
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
   if(f) {
+    const char* fstr = !f->isVarArg() ? f->getName().str().c_str() : std::string(f->getName().str() + "(...)").c_str();
     if(!state.isRecoveryState())
     {
        if(isFunctionToSkip(state, f))
-         klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), f->getName().str().c_str());
+        klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), fstr);
        else 
-      	klee_message("%s %s", prefix.c_str(), f->getName().str().c_str());
+        klee_message("%s %s", prefix.c_str(), fstr);
     }
     else
-      DEBUG_WITH_TYPE("recovery", klee_message("%s %s", prefix.c_str(), f->getName().str().c_str()));
+      DEBUG_WITH_TYPE("recovery", klee_message("%s %s", prefix.c_str(), fstr));
   }
   else // shouldn't happen
     klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
