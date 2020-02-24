@@ -41,7 +41,7 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
       assert((skipMode != Interpreter::CHOP_KEEP || i->lines.empty()) && "TODO: treat the case where lines aren't empty");
-      if(skipMode == Interpreter::CHOP_KEEP && f.isVarArg()) { // JOR: TODO: this should be for any skipMode, do it when the variadic stuff is clean
+      if(f.isVarArg()) {
         replaceVariadicCalls(&f, i->lines, module);
       }
       else {
@@ -199,50 +199,91 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
   paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
 
   // add variadic parameters types, from call
+  DEBUG_WITH_TYPE("variadic", klee_message("Making a wrapper for %s(...)", f.getName().str().c_str()));
   for (int argi = totalStaticArgCount; argi < totalArgCount; argi++) {
-    DEBUG_WITH_TYPE("variadic", klee_message("\t- Argument %d is: %s (type %d)", argi, 
+    DEBUG_WITH_TYPE("variadic", klee_message("- Variadic argument #%d is: '%s' (type %d)", argi, 
       call->getArgOperand(argi)->getName().str().c_str(), call->getArgOperand(argi)->getType()->getTypeID()));
     paramTypes.push_back(call->getArgOperand(argi)->getType());
   }
   
   // create new void function, that is NOT variadic
-  FunctionType *newFunctionType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(paramTypes), false);
-  string wrappedName = string("__wrap_") + f.getName().str() + "_vaarg" + std::to_string(totalArgCount);
-  Function *wrapper = cast<Function>(module.getOrInsertFunction(wrappedName, newFunctionType));
-  DEBUG_WITH_TYPE("variadic", klee_message("Making wrapper '%s'", wrappedName.c_str()));
+  FunctionType *staticFunctionType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(paramTypes), false);
 
-  // set the arguments' name: __result + original parameters' name + __vaarg_{i}
-  vector<Value *> argsForCall;
-  Function::arg_iterator i = wrapper->arg_begin();
-  Value *resultArg = i++;
-  resultArg->setName("__result");
-  for (Function::arg_iterator j = f.arg_begin(); j != f.arg_end(); j++) {
-    Value *origArg = j;
-    Value *arg = i++;
-    arg->setName(origArg->getName());
-    argsForCall.push_back(arg);
+  // we need to find a wrapper that matches the argument list of the call. this may take several tries
+  for(int wrapperTry = 1; ; wrapperTry++) {
+    // create a codified wrapper name
+    string wrappedName = string("__wrap_") + f.getName().str() + "_vaarg" + std::to_string(totalArgCount) + "v" + std::to_string(wrapperTry);
+    // check if (wrapperTry < number of wrappers made)
+    bool wrapperExists = module.getFunction(wrappedName) != NULL;
+    if(!wrapperExists) { // easy: just make the wrapper and return
+      return makeWrapper(f, wrappedName, staticFunctionType, module);
+    }
+
+    // okay, let's see if this wrapper we have is good. The arguments signature must match
+    Function *wrapper = cast<Function>(module.getOrInsertFunction(wrappedName, staticFunctionType));
+    DEBUG_WITH_TYPE("variadic", klee_message("Wrapper '%s' already exists:", wrappedName.c_str());
+      llvm::errs() << "\e[0;36m\""; wrapper->dump(); llvm::errs() << "\"\e[0;m");
+
+    // iterate over the call signature and the wrapper signature at the same time
+    int argi = 0;
+    llvm::Function::arg_iterator warg = wrapper->getArgumentList().begin();
+    warg++; // skip the "result" parameter
+    for(; ; warg++, argi++) {
+      if(warg == wrapper->getArgumentList().end()) {
+        assert(argi == totalArgCount && "arg count info does not match the wrapper found, that'd be a bug");
+        return wrapper; // we checked all arguments, they match, good!
+      }
+      // we are checking static arguments, we could probably skip that as they should be the same, but might as well make sure
+      Type* wrapperType = (*warg).getType();
+      Type* callType = call->getArgOperand(argi)->getType();
+      if(wrapperType != callType) {
+        DEBUG_WITH_TYPE("variadic", klee_message("but '%s' has bad signature because args #%d don't match: %d != %d", 
+          wrappedName.c_str(), argi, wrapperType->getTypeID(), callType->getTypeID());
+          llvm::errs() << "\e[0;31m" << *wrapperType << ", " << *callType << "\e[0;m\n";);
+        assert(argi >= totalStaticArgCount && "static arguments differ, that's bad");
+        break; // bad wrapper, try another one
+      }
+    }
   }
-  for (int argi = 0; i != wrapper->arg_end(); argi++) {
-    Value *arg = i++;
-    arg->setName(std::string("__vaarg_") + std::to_string(argi));
-    DEBUG_WITH_TYPE("variadic", klee_message("Added parameter %s", arg->getName().str().c_str()));
-    argsForCall.push_back(arg);
-  }
+}
 
-  // create basic block 'entry' in the new function
-  BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
-  IRBuilder<> builder(block);
+// this function should only be
+Function * klee::ReturnToVoidFunctionPass::makeWrapper(Function& f, std::string wrappedName, FunctionType *staticFunctionType, Module& module) {
+    assert(module.getFunction(wrappedName) == NULL && "makeWrapper should only be called with a wrapperName that is not used");
+    DEBUG_WITH_TYPE("variadic", klee_message("Making wrapper '%s'", wrappedName.c_str()));
+    Function *wrapper = cast<Function>(module.getOrInsertFunction(wrappedName, staticFunctionType));
 
-  // insert call to the original function
-  Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
-  // insert store for the return value to __result parameter
-  builder.CreateStore(callInst, resultArg);
-  // terminate function with void return
-  builder.CreateRetVoid();
+    // set the arguments' name: __result + original parameters' name + __vaarg{i}
+    vector<Value *> argsForCall;
+    Function::arg_iterator i = wrapper->arg_begin();
+    Value *resultArg = i++;
+    resultArg->setName("__result");
+    for (Function::arg_iterator j = f.arg_begin(); j != f.arg_end(); j++) {
+      Value *origArg = j;
+      Value *arg = i++;
+      arg->setName(origArg->getName());
+      argsForCall.push_back(arg);
+    }
+    for (int argi = 0; i != wrapper->arg_end(); argi++) {
+      Value *arg = i++;
+      arg->setName(std::string("__vaarg_") + std::to_string(argi));
+      DEBUG_WITH_TYPE("variadic", klee_message("Added parameter %s", arg->getName().str().c_str()));
+      argsForCall.push_back(arg);
+    }
 
-  DEBUG_WITH_TYPE("variadic", wrapper->dump());
+    // create basic block 'entry' in the new function
+    BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
+    IRBuilder<> builder(block);
 
-  return wrapper;
+    // insert call to the original function
+    Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
+    // insert store for the return value to __result parameter
+    builder.CreateStore(callInst, resultArg);
+    // terminate function with void return
+    builder.CreateRetVoid();
+
+    DEBUG_WITH_TYPE("variadic", llvm::errs() << "\e[0;36m"; wrapper->dump());
+    return wrapper;
 }
 
 /// We replace a given CallInst to f with a new CallInst to __wrap_f
