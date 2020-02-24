@@ -251,8 +251,7 @@ void KModule::addInternalFunction(const char* functionName){
 }
 
 void KModule::prepare(const Interpreter::ModuleOptions &opts,
-                      // Interpreter::SkipMode skipMode,
-                      // const std::vector<Interpreter::SkippedFunctionOption> &skippedFunctions,
+                      ReachabilityAnalysis *pre_ra,
                       Keeper *keeper,
                       InterpreterHandler *ih,
                       ReachabilityAnalysis *ra,
@@ -305,11 +304,44 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
               result->addIncoming(i->getOperand(0), bbit);
             }
             i->eraseFromParent();
-	    BranchInst::Create(exit, bbit);
+	          BranchInst::Create(exit, bbit);
           }
         }
       }
     }
+  }
+
+  // Run Keeper and set targets
+  AAPass pre_aa;
+  if(keeper->isSkipping()) {
+    // prepare RA
+    pre_ra->prepare();
+
+    // prepare PA
+    // AAPass pre_aa;
+    pre_aa.setPAType(PointerAnalysis::Andersen_WPA);
+
+    // run PA
+    klee_message("Runnining pointer pre-analysis...");
+    PassManager* pre_passManager = new PassManager();
+    pre_passManager->add(&pre_aa);
+    pre_passManager->run(*module);
+    
+    // run RA
+    klee_message("Runnining reachability pre-analysis...");
+    pre_ra->usePA(&pre_aa);
+    pre_ra->run(UseSVFPTA);
+
+    // run Keeper
+    keeper->run(); // uses pre_ra // TODO: change this so it runs RA itself?
+
+    // set targets
+    ra->setTargets(keeper->getSkippedTargets());
+    inliner->setTargets(keeper->getSkippedTargets());
+    mra->setTargets(keeper->getSkippedTargets());
+    klee_message("Deleting pm...");
+    delete pre_passManager;
+    klee_message("Deleting temps...");
   }
 
   // Inject checks prior to optimization... we also perform the
@@ -462,14 +494,15 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     inliner->run();
 
     /* run pointer analysis */
-    klee_message("Runnining pointer analysis...");
-    PassManager passManager;
-    passManager.add(aa);
-    passManager.run(*module);
+    // klee_message("Runnining pointer analysis...");
+    // PassManager passManager;
+    // passManager.add(aa);
+    // passManager.run(*module);
 
     /* run reachability analysis */
     klee_message("Runnining reachability analysis...");
-    ra->usePA(aa);
+    // ra->usePA(aa);
+    ra->usePA(&pre_aa);
     ra->run(UseSVFPTA);
 
     /* run mod-ref analysis */

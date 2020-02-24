@@ -68,12 +68,14 @@ public:
   typedef std::vector<SideEffect> SideEffects;
 
   ModRefAnalysis(llvm::Module *module, ReachabilityAnalysis *ra, AAPass *aa,
-                 std::string entry, std::vector<std::string> targets,
+                 std::string entry, //std::vector<std::string> targets,
                  llvm::raw_ostream &debugs);
 
   llvm::Function *getEntry();
 
   std::vector<llvm::Function *> getTargets();
+
+  void setTargets(std::vector<std::string> skippedTargets) { targets = skippedTargets; }
 
   void run();
 

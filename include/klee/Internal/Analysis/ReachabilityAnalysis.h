@@ -23,9 +23,9 @@ public:
   typedef std::map<llvm::Function *, InstructionSet> RetMap;
 
   ReachabilityAnalysis(llvm::Module *module, std::string entry,
-                       std::vector<std::string> targets,
+                      //  std::vector<std::string> targets,
                        llvm::raw_ostream &debugs)
-      : module(module), entry(entry), m_targets(targets), entryFunction(NULL),
+      : module(module), entry(entry), m_targets(), entryFunction(NULL),
         aa(NULL), debugs(debugs) {}
 
   ~ReachabilityAnalysis() {};
@@ -34,6 +34,8 @@ public:
   void prepare();
 
   void usePA(AAPass *aa) { this->aa = aa; }
+
+  void setTargets(std::vector<std::string> targets) { m_targets = targets; }
 
   bool run(bool usePA);
 

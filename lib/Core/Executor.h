@@ -221,6 +221,7 @@ private:
   std::vector<ExecutionState *> suspendedStates;
   std::vector<ExecutionState *> resumedStates;
   Keeper *keeper;
+  ReachabilityAnalysis *pre_ra;
   ReachabilityAnalysis *ra;
   Inliner *inliner;
   AAPass *aa;

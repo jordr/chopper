@@ -441,6 +441,7 @@ Executor::Executor(InterpreterOptions &opts, InterpreterHandler *ih)
   cloner = NULL;
   sliceGenerator = NULL;
   keeper = NULL;
+  pre_ra = NULL;
 }
 
 const Module *Executor::setModule(llvm::Module *module, 
@@ -463,18 +464,20 @@ const Module *Executor::setModule(llvm::Module *module,
 
   if (interpreterOpts.skipMode != CHOP_NONE) {
     logFile = interpreterHandler->openOutputFile("sa.log");
+    // std::vector<std::string> emptyTargets;
+    pre_ra = new ReachabilityAnalysis(module, opts.EntryPoint, /* emptyTargets, */ llvm::nulls()); // discard output
     /* build target functions */
-    std::vector<std::string> skippedTargets;
-    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
-    keeper->run();
-    skippedTargets = keeper->getSkippedTargets();
+    // std::vector<std::string> skippedTargets;
+    keeper = new Keeper(module, pre_ra, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
+    // keeper->run();
+    // skippedTargets = keeper->getSkippedTargets();
 
-    ra = new ReachabilityAnalysis(module, opts.EntryPoint, skippedTargets, *logFile);
-    inliner = new Inliner(module, ra, skippedTargets, interpreterOpts.inlinedFunctions, *logFile); // doesn't do anything except if -inline=f is specified
+    ra = new ReachabilityAnalysis(module, opts.EntryPoint, /* skippedTargets, */ *logFile);
+    inliner = new Inliner(module, ra, /* skippedTargets, */ interpreterOpts.inlinedFunctions, *logFile); // doesn't do anything except if -inline=f is specified
     aa = new AAPass();
     aa->setPAType(PointerAnalysis::Andersen_WPA);
 
-    mra = new ModRefAnalysis(kmodule->module, ra, aa, opts.EntryPoint, skippedTargets, *logFile);
+    mra = new ModRefAnalysis(kmodule->module, ra, aa, opts.EntryPoint, /* skippedTargets, */ *logFile);
     cloner = new Cloner(module, ra, *logFile);
     if (UseSlicer) {
       sliceGenerator = new SliceGenerator(module, ra, aa, mra, cloner, *logFile, LazySlicing);
@@ -482,7 +485,7 @@ const Module *Executor::setModule(llvm::Module *module,
   }
 
   // calls ReturnToVoidFunctionPass with (keeper.skipMode, keeper.selectedFunctions)
-  kmodule->prepare(opts, keeper, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
+  kmodule->prepare(opts, pre_ra, keeper, interpreterHandler, ra, inliner, aa, mra, cloner, sliceGenerator);
 
   specialFunctionHandler->bind();
 
@@ -513,6 +516,7 @@ Executor::~Executor() {
   if (inliner) delete inliner;
   if (ra) delete ra;
   if (keeper) delete keeper;
+  if (pre_ra) delete pre_ra;
   delete kmodule;
   while(!timers.empty()) {
     delete timers.back();

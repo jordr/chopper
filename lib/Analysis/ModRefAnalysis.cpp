@@ -31,10 +31,10 @@ ModRefAnalysis::ModRefAnalysis(
     ReachabilityAnalysis *ra,
     AAPass *aa,
     string entry,
-    vector<string> targets,
+    // vector<string> targets,
     llvm::raw_ostream &debugs
 ) :
-    module(module), ra(ra), aa(aa), entry(entry), targets(targets), debugs(debugs)
+    module(module), ra(ra), aa(aa), entry(entry), targets(/* targets */), debugs(debugs)
 {
 
 }

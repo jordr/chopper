@@ -7,6 +7,8 @@
 #include "llvm/Analysis/CallGraph.h"
 #include "klee/Interpreter.h"
 
+#include "ReachabilityAnalysis.h"
+
 class Keeper {
   class ReverseReachability {
   public:
@@ -17,8 +19,8 @@ class Keeper {
   };
   
 public:
-  Keeper(llvm::Module *module, klee::Interpreter::SkipMode skipMode, std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions, bool autoKeep, llvm::raw_ostream &debugs)
-        : module(module), skipMode(skipMode), selectedFunctions(selectedFunctions), autoKeep(autoKeep), debugs(debugs) {}
+  Keeper(llvm::Module *module, ReachabilityAnalysis *ra, klee::Interpreter::SkipMode skipMode, std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions, bool autoKeep, llvm::raw_ostream &debugs)
+        : module(module), ra(ra), skipMode(skipMode), selectedFunctions(selectedFunctions), autoKeep(autoKeep), debugs(debugs) {}
   void run();
 
   inline klee::Interpreter::SkipMode getSkipMode() const
@@ -41,6 +43,7 @@ private:
   std::vector<klee::Interpreter::SkippedFunctionOption> skippedFunctions;
 
   llvm::Module *module;
+  ReachabilityAnalysis *ra;
   klee::Interpreter::SkipMode skipMode;
   std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions; // comes from interpreterOpts.selectedFunctions
   bool autoKeep;

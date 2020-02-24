@@ -106,7 +106,7 @@ bool ReachabilityAnalysis::run(bool usePA) {
     if (!f) {
       // errs() << "function '" << name << "' is not found\n";
       // return false;
-      // JOR don't return here, treat this as non-critical
+      // JOR: don't return here, treat this as non-critical
       DEBUG_WITH_TYPE("chop", klee::klee_warning("[ReachabilityAnalysis] function '%s' is not found", name.c_str()));
       continue;
     }
@@ -422,6 +422,14 @@ void ReachabilityAnalysis::dumpReachableFunctions() {
   for (FunctionSet::iterator i = reachable.begin(); i != reachable.end(); i++) {
     Function *f = *i;
     debugs << "    " << f->getName() << "\n";
+  }
+  debugs << "\n";
+
+  debugs << "### JOR\n";
+  for (FunctionSet::iterator i = reachable.begin(); i != reachable.end(); i++) {
+    for (FunctionSet::iterator j = reachabilityMap[*i].begin(); j != reachabilityMap[*i].end(); j++) {
+      debugs << "    reachabilityMap[" << (*i)->getName() << "] = " << (*j)->getName() << "\n";
+    }
   }
   debugs << "\n";
 }

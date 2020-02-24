@@ -20,7 +20,6 @@ using namespace std;
 using namespace llvm;
 
 void Inliner::run() {
-    // JOR: It seems we only get !functions.empty() when -inline= is used
     if (functions.empty()) {
         klee::klee_message("Inliner: nothing to do.");
         return;

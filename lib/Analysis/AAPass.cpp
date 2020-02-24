@@ -12,7 +12,9 @@ static RegisterPass<AAPass> WHOLEPROGRAMPA("AAPass",
         "Whole Program Pointer Analysis Pass");
 
 AAPass::~AAPass() {
+    llvm::errs() << "\e[0;31mdeleting aapass\e[0;m: " << _pta;
     delete _pta;
+    llvm::errs() << "\e[0;31mDone\e[0;m: " << _pta << "\n";
 }
 
 bool AAPass::runOnModule(llvm::Module& module) {
@@ -24,6 +26,7 @@ void AAPass::runPointerAnalysis(llvm::Module& module, u32_t kind) {
     switch (kind) {
     case PointerAnalysis::Andersen_WPA:
         _pta = new Andersen();
+    llvm::errs() << "\e[0;31making new aapass\e[0;m: " << _pta  << "\n";
         break;
     case PointerAnalysis::AndersenLCD_WPA:
         _pta = new AndersenLCD();

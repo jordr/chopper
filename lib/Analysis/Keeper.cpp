@@ -284,16 +284,18 @@ Keeper::ReverseReachability::buildReverseReachabilityMap(llvm::CallGraph & CG, F
   while(! wl.empty()) {
     // for each fun in the working list
     bool isComplete;
-    const Function* fun = wl.pop_back_val();
-    const llvm::SmallVector<const Function *, 20>& callers = createCallerTable(CG, fun, isComplete);
+    const Function* callee = wl.pop_back_val();
+    const llvm::SmallVector<const Function *, 20>& callers = createCallerTable(CG, callee, isComplete);
  
-    // for each caller of fun
+    // for each caller of callee
+    DEBUG_WITH_TYPE("chop", klee::klee_message("\t\tNow at callee \e[0;35m'%s' \e[0m", callee->getName().str().c_str()));
     for(auto ci = callers.begin(); ci != callers.end(); ci++) {
+      DEBUG_WITH_TYPE("chop", klee::klee_message("\t\tCallee '%s' is called by '%s'", callee->getName().str().c_str(), (*ci)->getName().str().c_str()));
       if(*ci != F) { // useless check?
         // if we do not already know about this caller
         if(Ancestors.find(*ci) == Ancestors.end())
         {
-          DEBUG_WITH_TYPE("chop", klee::klee_message("\t-Ancestor: '%s' (calls '%s')", (*ci)->getName().str().c_str(), fun->getName().str().c_str()));
+          DEBUG_WITH_TYPE("chop", klee::klee_message("\t-Ancestor: '%s' (calls '%s')", (*ci)->getName().str().c_str(), callee->getName().str().c_str()));
           wl.push_back(*ci); // add it to the wl
         }
       }
@@ -338,10 +340,13 @@ Keeper::ReverseReachability::createCallerTable (llvm::CallGraph & CG, const Func
       llvm::CallGraphNode * CalleeNode = ti->second;
       Function * Target = CalleeNode->getFunction();
 
-      if (Target != F)
-        continue;
-
-      //if(Target) klee::klee_message("\t Target = %s, Source = %s, F = %s", Target->getName().str().c_str(), Caller->getName().str().c_str(), F->getName().str().c_str());
+      if(!Target) {
+        // could be a bitcast
+        klee::klee_message("\t \e[0;31m [ '%s' -> null ] (looking for '%s')\e[0;m", Caller->getName().str().c_str(), F->getName().str().c_str());
+        CalleeNode->print(llvm::errs());
+      }
+      else
+        klee::klee_message("\t [ '%s' -> '%s' ] (looking for '%s')", Caller->getName().str().c_str(), Target->getName().str().c_str(), F->getName().str().c_str());
 
       // Do not include intrinsic functions or functions that do not get
       // emitted into the final executable as targets.
@@ -350,10 +355,12 @@ Keeper::ReverseReachability::createCallerTable (llvm::CallGraph & CG, const Func
         continue;
       }
 
-      Callers.push_back(Caller); // JOR: why would I cast it to a void pointer?
+      if (Target == F) {
+        Callers.push_back(Caller);
 
-      // Add the target to the set of targets.  Cast it to a void pointer first.
-      // Targets.push_back (ConstantExpr::getZExtOrBitCast (Target, VoidPtrType));
+        // Add the target to the set of targets.  Cast it to a void pointer first.
+        // Targets.push_back (ConstantExpr::getZExtOrBitCast (Target, VoidPtrType));
+      }
     }
   }
   return Callers;
