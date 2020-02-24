@@ -40,9 +40,14 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
   bool changed = false;
   for (std::vector<Interpreter::SkippedFunctionOption>::const_iterator i = skippedFunctions.begin(); i != skippedFunctions.end(); i++) {
     if (string("__wrap_") + f.getName().str() == i->name) {
-      Function *wrapper = createWrapperFunction(f, module);
       assert((skipMode != Interpreter::CHOP_KEEP || i->lines.empty()) && "TODO: treat the case where lines aren't empty");
-      replaceCalls(&f, wrapper, i->lines);
+      if(skipMode == Interpreter::CHOP_KEEP && f.isVarArg()) { // JOR: TODO: this should be for any skipMode, do it when the variadic stuff is clean
+        replaceVariadicCalls(&f, i->lines, module);
+      }
+      else {
+        Function *wrapper = createWrapperFunction(f, module);
+        replaceCalls(&f, wrapper, i->lines);
+      }
       changed = true;
     }
   }
@@ -54,9 +59,6 @@ bool klee::ReturnToVoidFunctionPass::runOnFunction(Function &f, Module &module) 
 ///  1- takes as first argument a variable __result that will contain the result
 ///  2- calls f and stores the return value in __result
 Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Module &module) {
-  // JOR
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t createWrapperFunction(f=%s)", f.getName().str().c_str()));
-
   // create new function parameters: *return_var + original function's parameters
   vector<Type *> paramTypes;
   Type *returnType = f.getReturnType();
@@ -81,14 +83,28 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
     arg->setName(origArg->getName());
     argsForCall.push_back(arg);
   }
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Set the arguments"));
 
   // create basic block 'entry' in the new function
   BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
   IRBuilder<> builder(block);
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t\t[createWrapperFunction] Create BB entry"));
 
   // insert call to the original function
+  #ifdef DANIELS_WAY
+  if (f.isVarArg()) {
+    Type *VAListTy = StructType::create(
+      {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt8PtrTy(), builder.getInt8PtrTy});
+    Function *VAStart = Intrinsic::getDeclaration(f.getParent(), Intrinsic::vastart, {builder.getInt8PtrTy()});
+
+    Value *VAListTag = builder.CreateAlloca(VAListTy, builder.getInt32(1), "va_list_tag");
+    Value *DecayedVAListtag = builder.CreateBitCast(VAListTag, builder.getInt8PtrTy());
+    builder.CreateCall(VAStart, {DecayedVAListtag});
+    // Load the second argument call it n
+    // Call va_arg n times and push the returned value into argsForCall
+    // Call va_end with VAListTag
+
+    // TODO chqnge where it is called to include __vaargs_count as a second argu;ent
+  }
+  #endif
   Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
   // insert store for the return value to __result parameter
   builder.CreateStore(callInst, resultArg);
@@ -102,10 +118,8 @@ Function *klee::ReturnToVoidFunctionPass::createWrapperFunction(Function &f, Mod
 /// The replacement will occur at all call sites only if the user has not specified a given line in the '-skip-functions' options
 void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper, const vector<unsigned int> &lines) {
   vector<CallInst*> to_remove;
-  DEBUG_WITH_TYPE("temp1", klee_warning("Creating wrap for '%s'", f->getName().str().c_str()));
   for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
     if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
-      // DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("replaceCalls reached inst=%s", inst->getOpcodeName()));
       if (inst->getParent()->getParent() == wrapper) {
         continue;
       }
@@ -120,22 +134,115 @@ void klee::ReturnToVoidFunctionPass::replaceCalls(Function *f, Function *wrapper
       }
 
       if (CallInst *call = dyn_cast<CallInst>(inst)) {
-        DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\treplaceCall to call, arg[0]=%s (%d args) by f=%s",
-           "", call->getNumArgOperands(), f->getName().str().c_str()));
-        if(replaceCall(call, f, wrapper) != 0) {
-          DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("Failed to replace call to f=%s", f->getName().str().c_str()));
-          // assert(false);
-          // shouldn't we to report the error to the caller of replaceCalls? Probably, right?
-        }
-        else
+        if(replaceCall(call, f, wrapper) == 0)
           to_remove.push_back(call);
       }
     }
   }
-  DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("end"));
   for (auto ci = to_remove.begin(), ce = to_remove.end(); ci != ce; ci++) {
     (*ci)->eraseFromParent();
   }
+}
+
+/// variadic variant
+void klee::ReturnToVoidFunctionPass::replaceVariadicCalls(Function *f, const vector<unsigned int> &lines, Module &module) {
+  vector<CallInst*> to_remove;
+  for (auto ui = f->use_begin(), ue = f->use_end(); ui != ue; ui++) {
+    if (Instruction *inst = dyn_cast<Instruction>(*ui)) {
+      if (isMatchingWrapper(inst->getParent()->getParent(), f)) {
+        continue;
+      }
+
+      if (!lines.empty()) {
+        if (MDNode *N = inst->getMetadata("dbg")) {
+          DILocation Loc(N);
+          if (find(lines.begin(), lines.end(), Loc.getLineNumber()) == lines.end()) {
+            continue;
+          }
+        }
+      }
+
+      if (CallInst *call = dyn_cast<CallInst>(inst)) {
+        Function* wrapper = getOrMakeWrapper(*f, call, module);
+        if(replaceCall(call, f, wrapper) == 0)
+          to_remove.push_back(call);
+      }
+    }
+  }
+  for (auto ci = to_remove.begin(), ce = to_remove.end(); ci != ce; ci++) {
+    (*ci)->eraseFromParent();
+  }
+}
+
+bool klee::ReturnToVoidFunctionPass::isMatchingWrapper(llvm::Function* wrapper, Function* wrappee) {
+  return wrapper->getName().startswith(llvm::StringRef("__wrap_" + wrappee->getName().str()));
+}
+
+// JOR: this is only called for variadic functions now
+// JOR: TODO merge with createWrapperFunction
+// JOR: TODO fix code around that uses == __wrap_ + f
+// JOR: TODO build a table of wrappers and check that it is not in there before making one
+Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallInst* call, Module &module) {
+  assert(f.isVarArg());
+  const int totalArgCount = call->getNumArgOperands();
+  const int totalStaticArgCount = f.getFunctionType()->getNumParams();
+
+  // JOR: TODO add the attributes to argsForCall
+  // JOR: TODO add the attributes to wrapper paramTypes
+  
+  // create new function parameters: *return_var + original function's parameters + variadic parameters
+  vector<Type *> paramTypes;
+  Type *returnType = f.getReturnType();
+  
+  assert(!returnType->isVoidTy() && "Can't create a wrapper for a void type");
+  paramTypes.push_back(PointerType::get(returnType, 0));
+  paramTypes.insert(paramTypes.end(), f.getFunctionType()->param_begin(), f.getFunctionType()->param_end());
+
+  // add variadic parameters types, from call
+  for (int argi = totalStaticArgCount; argi < totalArgCount; argi++) {
+    DEBUG_WITH_TYPE("variadic", klee_message("\t- Argument %d is: %s (type %d)", argi, 
+      call->getArgOperand(argi)->getName().str().c_str(), call->getArgOperand(argi)->getType()->getTypeID()));
+    paramTypes.push_back(call->getArgOperand(argi)->getType());
+  }
+  
+  // create new void function, that is NOT variadic
+  FunctionType *newFunctionType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(paramTypes), false);
+  string wrappedName = string("__wrap_") + f.getName().str() + "_vaarg" + std::to_string(totalArgCount);
+  Function *wrapper = cast<Function>(module.getOrInsertFunction(wrappedName, newFunctionType));
+  DEBUG_WITH_TYPE("variadic", klee_message("Making wrapper '%s'", wrappedName.c_str()));
+
+  // set the arguments' name: __result + original parameters' name + __vaarg_{i}
+  vector<Value *> argsForCall;
+  Function::arg_iterator i = wrapper->arg_begin();
+  Value *resultArg = i++;
+  resultArg->setName("__result");
+  for (Function::arg_iterator j = f.arg_begin(); j != f.arg_end(); j++) {
+    Value *origArg = j;
+    Value *arg = i++;
+    arg->setName(origArg->getName());
+    argsForCall.push_back(arg);
+  }
+  for (int argi = 0; i != wrapper->arg_end(); argi++) {
+    Value *arg = i++;
+    arg->setName(std::string("__vaarg_") + std::to_string(argi));
+    DEBUG_WITH_TYPE("variadic", klee_message("Added parameter %s", arg->getName().str().c_str()));
+    argsForCall.push_back(arg);
+  }
+
+  // create basic block 'entry' in the new function
+  BasicBlock *block = BasicBlock::Create(getGlobalContext(), "entry", wrapper);
+  IRBuilder<> builder(block);
+
+  // insert call to the original function
+  Value *callInst = builder.CreateCall(&f, makeArrayRef(argsForCall), "__call");
+  // insert store for the return value to __result parameter
+  builder.CreateStore(callInst, resultArg);
+  // terminate function with void return
+  builder.CreateRetVoid();
+
+  DEBUG_WITH_TYPE("variadic", wrapper->dump());
+
+  return wrapper;
 }
 
 /// We replace a given CallInst to f with a new CallInst to __wrap_f
@@ -186,31 +293,26 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
     ss << "(TYPE=" << *origCallInst->getArgOperand(i)->getType() << ")";
     ss << "(TID=" << (origCallInst->getArgOperand(i)->getType()->getTypeID()) << ")";
     DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("\t- originalCall.argoperand[%d] = %s", i, ss.str().c_str()));
-  
-    // JOR hax
-    // if(origCallInst->getArgOperand(i)->getType()->getTypeID() == Type::TypeID::PointerTyID)
-    // {
-    //   klee_message("returning becauuse argoperand is type  .........  %d", Type::TypeID::PointerTyID);
-    //   return;
-    // }
+    if(f->isVarArg())
+      DEBUG_WITH_TYPE("variadic", klee_warning("\t- originalCall.argoperand[%d] = %s", i, ss.str().c_str()));
   }
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("CreateCall! wrapper=%s, origCallInst->getNumArgOperands()=%d, ", wrapper->getName().str().c_str(), origCallInst->getNumArgOperands())); 
   FunctionType *FTy = cast<FunctionType>(cast<PointerType>(wrapper->getType())->getElementType());
-  const int wrapper_num_params = FTy->getNumParams();
+  const unsigned wrapper_num_params = FTy->getNumParams();
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("getNumParams of wrapper= %d, type = %d", wrapper_num_params, wrapper->getType()->getTypeID()));
   DEBUG_WITH_TYPE(DEBUG_SIGNATURES, klee_warning("f.CONV:%d, wrapper.CONV:%d", f->getCallingConv(), wrapper->getCallingConv()));
 
   // JOR dodge LLVM assert....
   llvm::ArrayRef<Value*> Args = makeArrayRef(argsForCall);
-  if(!(Args.size() == FTy->getNumParams() || (FTy->isVarArg() && Args.size() > FTy->getNumParams())))
+  if(!(Args.size() == wrapper_num_params || (FTy->isVarArg() && Args.size() > wrapper_num_params)))
   {
-    klee_warning("\e[1;35mWrapper has bad signature: '%s'! LLVM refuses to create call. Args.size()=%d, FTy->getNumParams()=%d, FTY->isVarArg()=%d",
-      f->getName().str().c_str(), (int)Args.size(), FTy->getNumParams(), (FTy->isVarArg()));
+    klee_warning("\e[1;35mWrapper has bad signature: '%s'! LLVM refuses to create call. Args.size()=%d, wrapper_num_params=%d, FTY->isVarArg()=%d",
+      f->getName().str().c_str(), (int)Args.size(), wrapper_num_params, (FTy->isVarArg()));
     return 1;
   }
   for (unsigned i = 0; i != Args.size(); ++i)
   {
-    if(! (i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) )
+    if(! (i >= wrapper_num_params || FTy->getParamType(i) == Args[i]->getType()) )
     {
       klee_warning("\e[1;35mWrapper has bad signature: '%s'! bad type of Args[%d].type=%d =/= wrapper.type=%d LLVM refuses to create call.\e[0;m",
         f->getName().str().c_str(), i, Args[i]->getType()->getTypeID(), FTy->getParamType(i)->getTypeID());
@@ -218,7 +320,7 @@ int klee::ReturnToVoidFunctionPass::replaceCall(CallInst *origCallInst, Function
     }
   }
 
-  CallInst *callInst = builder.CreateCall(wrapper, makeArrayRef(argsForCall));
+  CallInst *callInst = builder.CreateCall(wrapper, Args);
   callInst->setDebugLoc(origCallInst->getDebugLoc());
 
   // if there was a StoreInst, we remove it

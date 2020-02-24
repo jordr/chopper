@@ -1415,9 +1415,14 @@ void Executor::executeCall(ExecutionState &state,
     case Intrinsic::vastart:  {
       StackFrame &sf = state.stack.back();
 
+      klee_message("\e[0;32mWEEOOOO: Entering vaargs case");
       // varargs can be zero if no varargs were provided
       if (!sf.varargs)
         return;
+      
+      klee_message("\e[0;31m WEEEEE: %d \e[0;m", sf.varargs->size);
+      state.dumpStack(llvm::errs()); // JOR:
+      // assert(false);
 
       // FIXME: This is really specific to the architecture, not the pointer
       // size. This happens to work fir x86-32 and x86-64, however.
@@ -3756,6 +3761,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
+      target->getOrigInst()->print(errs());
+      // assert(false);
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
     }
