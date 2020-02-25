@@ -220,10 +220,16 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
     }
 
     // okay, let's see if this wrapper we have is good. The arguments signature must match
-    Function *wrapper = cast<Function>(module.getOrInsertFunction(wrappedName, staticFunctionType));
-    DEBUG_WITH_TYPE("variadic", klee_message("Wrapper '%s' already exists:", wrappedName.c_str());
+    Function *wrapper = dyn_cast_or_null<Function>(module.getOrInsertFunction(wrappedName, staticFunctionType));
+    if(!wrapper) {
+      DEBUG_WITH_TYPE("variadic", klee_message("Wrapper '%s' already exists, but LLVM says it is the wrong type. Continuing...", wrappedName.c_str()));
+      continue;
+    }
+
+    DEBUG_WITH_TYPE("variadic", klee_message("Wrapper '%s' already exists, and LLVM claims it is the right type:", wrappedName.c_str());
       llvm::errs() << "\e[0;36m\""; wrapper->dump(); llvm::errs() << "\"\e[0;m");
 
+    // TODO: JOR: I don't think this is useful anymore since LLVM does type checking
     // iterate over the call signature and the wrapper signature at the same time
     int argi = 0;
     llvm::Function::arg_iterator warg = wrapper->getArgumentList().begin();
