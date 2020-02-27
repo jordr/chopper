@@ -465,7 +465,7 @@ const Module *Executor::setModule(llvm::Module *module,
     logFile = interpreterHandler->openOutputFile("sa.log");
     /* build target functions */
     std::vector<std::string> skippedTargets;
-    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.autoKeep, *logFile);
+    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.keptFunctions, interpreterOpts.autoKeep);
     keeper->run();
     skippedTargets = keeper->getSkippedTargets();
 

@@ -13,20 +13,21 @@
 using klee::Interpreter;
 using llvm::Function;
 
-// JOR: TODO: make this a pass
+// JOR: TODO: make this a pass?
 
 struct FunctionClass {
   enum {
     INVALID=-1,
-    SKIP=0,
-    AUTOKEEP=1,
-    SELECTED=2,
-    ANCESTOR=3,
+    SKIP=0,      // skipped
+    AUTOKEEP=1,  // kept because it's a bad function to skip
+    WHITELIST=2, // kept because user told us it's a bad function to skip
+    ANCESTOR=3,  // kept because it calls where we want to go
+    SELECTED=4,  // kept because it's where we want to go
   };
   int type;
   enum {
-    NONE=0,
     // this will be the sorting order
+    NONE=0,
     SPECIAL,
     LIBC,
     INTRINSIC,
@@ -68,6 +69,7 @@ void Keeper::run() {
     std::set<const Function*> ancestors;
     generateAncestors(ancestors);
     generateSkippedTargets(ancestors);
+    // duplicate info into skippedFunctions for convenience accessors
     for (auto i = skippedTargets.begin(), e = skippedTargets.end(); i != e; i++) {
       std::vector<unsigned int> empty_lines;
       skippedFunctions.push_back(Interpreter::SkippedFunctionOption(*i, empty_lines));
@@ -123,28 +125,30 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     funClass.type = FunctionClass::SKIP;
     funClass.key = (*i).getKey();
     funClass.isVoidFunction = f->getReturnType()->isVoidTy();
+    funClass.filename = getFilenameOfFunction(f);
 
     for (auto i = selectedFunctions.begin(), e = selectedFunctions.end(); i != e; i++) {
       if(i->name == funClass.key) {
         funClass.type = FunctionClass::SELECTED;
-        break;
+        goto classification_done;
+      }
+    }
+    
+    for (auto i = whitelist.begin(), e = whitelist.end(); i != e; i++) {
+      if(i->name == funClass.key) {
+        funClass.type = FunctionClass::WHITELIST;
+        goto classification_done;
       }
     }
 
-    { // JOR: getting the filename
-      llvm::DebugInfoFinder Finder;
-      Finder.processModule(*f->getParent());
-      for (llvm::DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
-        const llvm::MDNode* node = *Iter;
-        llvm::DISubprogram SP(node);
-        if (SP.describes(f)) {
-          funClass.filename = SP.getFilename(); // JOR:SP.getFlags() could also be interesting?
-          break;
+    if(autoKeep) {
+      // special function detection
+      for(klee::SpecialFunctionHandler::const_iterator sf = klee::SpecialFunctionHandler::begin(), se = klee::SpecialFunctionHandler::end(); sf != se; ++sf) {
+        if(strcmp(funClass.key.c_str(), sf->name) == 0) {
+          funClass.type = FunctionClass::AUTOKEEP;
+          funClass.autokeepReason = FunctionClass::SPECIAL;
         }
       }
-    }
-
-    if(autoKeep && funClass.type == FunctionClass::SKIP) {
       // autokeep includes ancestor lookup for now
       if(ancestors.find(f) != ancestors.end()) {
         funClass.type = FunctionClass::ANCESTOR;
@@ -162,11 +166,11 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
         funClass.autokeepReason = FunctionClass::LIBC;
       }
       // JOR: TODO: this is hacky, can we use the above + something for klee_init_env and others?
-      else if(f->getName().startswith(llvm::StringRef("klee_")) || f->getName().str() == "__fd_stat") {
+      else if(f->getName().startswith(llvm::StringRef("klee_"))) {
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::KLEE;
       }
-      else if(f->getName().str() == "syscall" || f->getName().str() == "open" || f->getName().str() == "close") {
+      else if(f->getName().str() == "syscall" || f->getName().str() == "open" || f->getName().str() == "close" || f->getName().str() == "__fd_stat") {
         funClass.type = FunctionClass::AUTOKEEP;
         funClass.autokeepReason = FunctionClass::SYSTEM;
       }
@@ -178,15 +182,9 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       // weak linkage
       // internal linkage
       // hasDLLExportLinkage || hasDLLImportLinkage
-
-      for(klee::SpecialFunctionHandler::const_iterator sf = klee::SpecialFunctionHandler::begin(), se = klee::SpecialFunctionHandler::end(); sf != se; ++sf) {
-        if(strcmp(funClass.key.c_str(), sf->name) == 0) {
-          // klee::klee_warning("Special function scanned: '%s', doesNotReturn=%d, hasReturnValue=%d", sf->name, sf->doesNotReturn, sf->hasReturnValue);
-          funClass.type = FunctionClass::AUTOKEEP;
-          funClass.autokeepReason = FunctionClass::SPECIAL;
-        }
-      }
     }
+
+classification_done:
     classifiedFunctions.push_back(funClass);
   }
 
@@ -233,10 +231,12 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     }
 
     DEBUG_WITH_TYPE("chop", klee::klee_message("\e[49m%s\e[0;m|%s %s %s",
-      prettifyFileName(fi->filename).c_str(),
-        (fi->type == FunctionClass::ANCESTOR ? "ANCESTOR|\e[0;32m" : 
-        (fi->type == FunctionClass::AUTOKEEP ? "AUTOKEEP|\e[0;33m" : 
-        (fi->type == FunctionClass::SKIP ? "SKIP    |\e[0;31m" : "KEEP    |\e[0;92m"))),
+      prettifyFilename(fi->filename).c_str(),
+        (fi->type == FunctionClass::WHITELIST ? "WHITELST|\e[0;92m" : 
+        (fi->type == FunctionClass::ANCESTOR  ? "ANCESTOR|\e[0;32m" :
+        (fi->type == FunctionClass::AUTOKEEP  ? "AUTOKEEP|\e[0;33m" : 
+        (fi->type == FunctionClass::SKIP      ? "SKIP    |\e[0;31m" :
+        "KEEP    |\e[0;92m")))),
       fi->key.c_str(),
       reasonStr));
 
@@ -259,7 +259,20 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
     klee::klee_error("\e[1;35mRoot function __user_main is skipped!\e[0;m");
 }
 
-std::string Keeper::prettifyFileName(llvm::StringRef filename) {
+llvm::StringRef Keeper::getFilenameOfFunction(Function* f) {
+  llvm::DebugInfoFinder Finder;
+  Finder.processModule(*f->getParent());
+  for (llvm::DebugInfoFinder::iterator Iter = Finder.subprogram_begin(), End = Finder.subprogram_end(); Iter != End; ++Iter) {
+    const llvm::MDNode* node = *Iter;
+    llvm::DISubprogram SP(node);
+    if (SP.describes(f)) {
+      return SP.getFilename(); // JOR: SP.getFlags() could also be interesting?
+    }
+  }
+  return llvm::StringRef(); // we did not find it, it's okay
+}
+
+std::string Keeper::prettifyFilename(llvm::StringRef filename) {
     const char* sep = "/";//"\u25B6";
     std::string filenamePretty = filename;
     if(filename.find("/") != filename.npos)

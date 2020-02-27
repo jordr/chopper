@@ -91,6 +91,12 @@ namespace {
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));
 
+  cl::opt<std::string> KeptFunctions(
+      "keep",
+      cl::desc("Comma-separated list of functions that should never be skipped (does not affect autokeep). "
+               "Optionally, a line number can be specified to choose a specific call site "
+               "(e.g. <function1>[:line],<function2>[:line],..)"));
+
   cl::opt<bool>
   AutoKeep("autokeep",
            cl::desc("Automatically tag some functions (libc...) for keeping"),
@@ -1280,20 +1286,19 @@ void parseSkippingParameter(
     std::string fname;
 
     while (std::getline(stream, token, ',')) {
-        std::vector<unsigned int> lines;
-        if (!parseNameLineOption(token, fname, lines)) {
-            klee_error("skip-function option: invalid parameter: %s", token.c_str());
-        }
-        Function *f = module->getFunction(fname);
-		if (!f) {
-          klee_error("skip-function option: '%s' not found in module.", fname.c_str());
-        }
+      std::vector<unsigned int> lines;
+      if (!parseNameLineOption(token, fname, lines)) {
+          klee_error("skip-function option: invalid parameter: %s", token.c_str());
+      }
+      Function *f = module->getFunction(fname);
+      if (!f) {
+        klee_error("skip-function option: '%s' not found in module.", fname.c_str());
+      }
 
-		if (!f->getReturnType()->isVoidTy()) {
-      if(addWrap) // JOR
-		    fname = std::string("__wrap_") + fname;
-		}
-        result.push_back(Interpreter::SkippedFunctionOption(fname, lines));
+      if (!f->getReturnType()->isVoidTy() && addWrap) {
+        fname = std::string("__wrap_") + fname;
+      }
+      result.push_back(Interpreter::SkippedFunctionOption(fname, lines));
     }
 }
 
@@ -1510,30 +1515,31 @@ int main(int argc, char **argv, char **envp) {
   
   // JOR
   std::vector<unsigned int> WarningFilterVector;
-  // parseSkippingParameter(mainModule, WarningFilter, WarningFilterVector, true);
     std::istringstream stream(WarningFilter);
     std::string token;
     std::string fname;
-    while (std::getline(stream, token, ','))
-    {
+    while (std::getline(stream, token, ',')) {
       std::vector<unsigned int> lines;
       if (!parseNameLineOption(token, fname, lines)) {
           klee_error("wfilter option: invalid parameter: %s", token.c_str());
       }
       unsigned int hash = std::stoul(fname, nullptr, 16);
       WarningFilterVector.push_back(hash);
-      // klee_warning("Added warning filter %d", hash);
     }
   if(!WarningFilterVector.empty())
     klee::klee_warning_filter = &WarningFilterVector;
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
+  std::vector<Interpreter::SkippedFunctionOption> keptOptions;
   Interpreter::SkipMode skipMode;
   parseSkippingParameter(mainModule, NotSkippedFunctions, skippingOptionsNot, false);
+  parseSkippingParameter(mainModule, KeptFunctions, keptOptions, false);
   parseSkippingParameter(mainModule, LegacySkippedFunctions, skippingOptionsLegacy, true); // this adds __wrap
   if(!skippingOptionsNot.empty() && !skippingOptionsLegacy.empty())
     klee_error("Cannot specify both --skip-functions-legacy and --skip-functions-not.");
+  else if(!keptOptions.empty() && !skippingOptionsLegacy.empty())
+    klee_error("Cannot specify both --keep and --skip-functions-legacy.");
   else if(!skippingOptionsLegacy.empty())
     skipMode = Interpreter::CHOP_LEGACY;
   else if(!skippingOptionsNot.empty())
@@ -1596,6 +1602,7 @@ int main(int argc, char **argv, char **envp) {
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   IOpts.skipMode = skipMode;
   IOpts.selectedFunctions = skipMode == Interpreter::CHOP_KEEP ? skippingOptionsNot : skippingOptionsLegacy;
+  IOpts.keptFunctions = keptOptions;
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;

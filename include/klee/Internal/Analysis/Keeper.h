@@ -17,8 +17,12 @@ class Keeper {
   };
   
 public:
-  Keeper(llvm::Module *module, klee::Interpreter::SkipMode skipMode, std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions, bool autoKeep, llvm::raw_ostream &debugs)
-        : module(module), skipMode(skipMode), selectedFunctions(selectedFunctions), autoKeep(autoKeep), debugs(debugs) {}
+  Keeper(llvm::Module *module,
+    klee::Interpreter::SkipMode skipMode,
+    std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions,
+    std::vector<klee::Interpreter::SkippedFunctionOption>& whitelist,
+    bool autoKeep)
+      : module(module), skipMode(skipMode), selectedFunctions(selectedFunctions), whitelist(whitelist), autoKeep(autoKeep) {}
   void run();
 
   inline klee::Interpreter::SkipMode getSkipMode() const
@@ -37,16 +41,23 @@ public:
 private:
   void generateAncestors(std::set<const llvm::Function*>& ancestors);
   void generateSkippedTargets(const std::set<const llvm::Function*>& ancestors);
-  static std::string prettifyFileName(llvm::StringRef filename);
+  llvm::StringRef getFilenameOfFunction(llvm::Function* f);
+  static std::string prettifyFilename(llvm::StringRef filename);
 
-  std::vector<std::string> skippedTargets; // semantics: actually skipped functions
+  // @brief Actually skipped targets
+  std::vector<std::string> skippedTargets;
+  // @brief Actually skipped functions (redundancy with skippedTargets, adds line info)
   std::vector<klee::Interpreter::SkippedFunctionOption> skippedFunctions;
 
   llvm::Module *module;
+  // @brief Chopper mode (legacy, keep, or none)
   klee::Interpreter::SkipMode skipMode;
-  std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions; // comes from interpreterOpts.selectedFunctions
+  // @brief functions selected in interpreterOpts.selectedFunctions
+  std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions;
+  // @brief whitelist of functions to keep, comes from interpreterOpts as well
+  std::vector<klee::Interpreter::SkippedFunctionOption>& whitelist;
+  // @brief Whether autokeep is activated or not (whitelists bad functions, looks for ancestors)
   bool autoKeep;
-  llvm::raw_ostream &debugs;
 };
 
 #endif /* KEEPER_H */

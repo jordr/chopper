@@ -114,10 +114,12 @@ public:
     unsigned MakeConcreteSymbolic;
     /* @brief Chopper: selected skip mode */
     SkipMode skipMode;
-    /* @brief Chopper: Functions to be skipped, regardless of the skipMode */
+    /* @brief Chopper: Functions to be skipped or kept, depending on the skipMode */
     std::vector<SkippedFunctionOption> selectedFunctions;
-    /* @brief Chopper: Enable autokeep in only-keep mode */
+    /* @brief Chopper: Enable autokeep in CHOP_KEEP mode */
     bool autoKeep;
+    /* @brief Chopper: Additional functions to be kept (does not trigger autokeep) */
+    std::vector<SkippedFunctionOption> keptFunctions;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;
