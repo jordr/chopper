@@ -312,24 +312,23 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   }
 
   // Run Keeper and set targets
-  AAPass pre_aa;
+  PassManager pre_passManager;
   if(keeper->isSkipping()) {
     // prepare RA
     pre_ra->prepare();
 
     // prepare PA
     // AAPass pre_aa;
-    pre_aa.setPAType(PointerAnalysis::Andersen_WPA);
+    // aa.setPAType(PointerAnalysis::Andersen_WPA);
 
     // run PA
     klee_message("Runnining pointer pre-analysis...");
-    PassManager* pre_passManager = new PassManager();
-    pre_passManager->add(&pre_aa);
-    pre_passManager->run(*module);
+    pre_passManager.add(aa);
+    pre_passManager.run(*module);
     
     // run RA
     klee_message("Runnining reachability pre-analysis...");
-    pre_ra->usePA(&pre_aa);
+    pre_ra->usePA(aa);
     pre_ra->run(UseSVFPTA);
 
     // run Keeper
@@ -339,9 +338,6 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     ra->setTargets(keeper->getSkippedTargets());
     inliner->setTargets(keeper->getSkippedTargets());
     mra->setTargets(keeper->getSkippedTargets());
-    klee_message("Deleting pm...");
-    delete pre_passManager;
-    klee_message("Deleting temps...");
   }
 
   // Inject checks prior to optimization... we also perform the
@@ -500,13 +496,12 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     // passManager.run(*module);
 
     /* run reachability analysis */
-    klee_message("Runnining reachability analysis...");
-    // ra->usePA(aa);
-    ra->usePA(&pre_aa);
+    klee_message("Running reachability analysis...");
+    ra->usePA(aa);
     ra->run(UseSVFPTA);
 
     /* run mod-ref analysis */
-    klee_message("Runnining mod-ref analysis...");
+    klee_message("Running mod-ref analysis...");
     mra->run();
 
     if (sliceGenerator) {
