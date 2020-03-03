@@ -1386,6 +1386,7 @@ void Executor::executeCall(ExecutionState &state,
   std::string prefix;
   for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
   if(f) {
+    DEBUG_WITH_TYPE("instcount", llvm::errs() << "\n";);
     std::string fstr = !f->isVarArg() ? f->getName().str() : std::string(f->getName().str() + "(...)");
     if(!state.isRecoveryState())
     {
@@ -1721,6 +1722,9 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+  // i->dump();
+  static int instcount = 0;
+  DEBUG_WITH_TYPE("instcount", if(instcount++ % 10 == 0) llvm::errs() << "|";);
   /* TODO: replace with a better predicate (call stack counter?) */
   if (state.isRecoveryState() && state.getExitInst() == i) {
     onRecoveryStateExit(state);
