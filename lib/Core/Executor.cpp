@@ -1383,26 +1383,25 @@ void Executor::executeCall(ExecutionState &state,
   Instruction *i = ki->inst;
 
   // JOR: debugging
-  std::string prefix;
-  for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
-  if(f) {
-    DEBUG_WITH_TYPE("instcount", llvm::errs() << "\n";);
-    std::string fstr = !f->isVarArg() ? f->getName().str() : std::string(f->getName().str() + "(...)");
-    if(!state.isRecoveryState())
-    {
-       if(isFunctionToSkip(state, f))
-        klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), fstr.c_str());
-       else 
-        klee_message("%s %s", prefix.c_str(), fstr.c_str());
+  if(PrintFunctionCalls) {
+    std::string prefix;
+    for(unsigned i = 0; i < state.stack.size(); i++) prefix += state.isRecoveryState() ? "R " : "\u25A0 ";
+    if(f) {
+      DEBUG_WITH_TYPE("instcount", llvm::errs() << "\n";);
+      std::string fstr = !f->isVarArg() ? f->getName().str() : std::string(f->getName().str() + "(...)");
+      if(!state.isRecoveryState())
+      {
+        if(isFunctionToSkip(state, f))
+          klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), fstr.c_str());
+        else 
+          klee_message("%s %s", prefix.c_str(), fstr.c_str());
+      }
+      else
+        DEBUG_WITH_TYPE("recovery", klee_message("%s %s", prefix.c_str(), fstr.c_str()));
     }
-    else
-      DEBUG_WITH_TYPE("recovery", klee_message("%s %s", prefix.c_str(), fstr.c_str()));
+    else // shouldn't happen
+      klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
   }
-  else // shouldn't happen
-    klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
-
-  if (f && PrintFunctionCalls)
-    klee_message("Function: %s", f->getName().str().c_str());
 
   if (f && f->isDeclaration()) {
     switch(f->getIntrinsicID()) {
@@ -4175,10 +4174,16 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
   }
 
   // JOR: debugging
-  std::string prefix;
-  for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
-  for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++) {
-    klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());//, state.stack.back().kf->function->getName().str().c_str());
+  if(PrintFunctionCalls) {
+    std::string prefix;
+    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u25A0 ";
+    int count = 0, len = recoveryInfos.size();
+    for(auto i = recoveryInfos.begin(); i != recoveryInfos.end(); i++, count++) {
+      if(len > 1)
+        klee_message("\e[33m%s %s (recovery %d/%d)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str(), count+1, len);
+      else
+        klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());
+    }
   }
 
   /* TODO: move to another place? */
