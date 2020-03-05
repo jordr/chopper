@@ -296,7 +296,53 @@ std::string Keeper::prettifyFilename(llvm::StringRef filename) {
     return filenamePretty;
 }
 
-/* reverse reachability stuff */ 
+bool Keeper::isFunctionToSkip(llvm::Function* f) {
+  llvm::StringRef fname = f->getName();
+  // for variadics
+  if(fname.startswith(llvm::StringRef("__wrap_")))
+    return true;
+  // if it was marked as a function to keep from start
+  if(std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) == skippedTargets.end())
+    return false;
+  // otherwise, check with heuristics
+  if(chopstats.find(f) != chopstats.end()) {
+    ChopperStats& cs = chopstats[f];
+    klee::klee_message("skipping heuristics: '%s' is %d/%d/%d", 
+      fname.str().c_str(), cs.numSkips, cs.numRecoveries, (int)cs.totalRecoveryTime);
+    if(cs.numRecoveries >= 3) {
+      if(cs.numRecoveries / cs.numSkips >= 2) { // numskips should always be non null
+        klee::klee_message("skipping heuristics: keeping '%s'!", fname.str().c_str());
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+void Keeper::skippingRiskyFunction(llvm::Function* f) {
+  ChopperStats& cs = getOrInsertChopstats(f);
+  cs.numSkips++;
+}
+
+void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
+  ChopperStats& cs = getOrInsertChopstats(ri->f);
+  //cs.numRecoveries++;
+  cs.recoveryTimer = new klee::WallTimer();
+  // TODO: exploit other RecoveryInfo?
+}
+
+void Keeper::recoveredFunction(llvm::Function* f) {
+  ChopperStats& cs = chopstats[f]; // should always exist
+  assert(cs.recoveryTimer);
+  cs.numRecoveries++; // moved here to have the timer keep track of something
+  cs.totalRecoveryTime += cs.recoveryTimer->check();
+  delete cs.recoveryTimer;
+  cs.recoveryTimer = 0x0;
+}
+
+/******************************************************************/ 
+/******************* reverse reachability stuff *******************/ 
+/******************************************************************/ 
 // JOR: TODO: This working list algorithm could be improved, it parses the same element in the working list several times
 std::set<const llvm::Function*> 
 Keeper::ReverseReachability::buildReverseReachabilityMap(llvm::CallGraph & CG, Function* F) {

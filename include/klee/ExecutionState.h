@@ -21,7 +21,7 @@
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
 #include "klee/Internal/Module/KInstIterator.h"
-#include "klee/Internal/Module/KModule.h"
+// #include "klee/Internal/Module/KModule.h"
 
 #include <map>
 #include <set>

@@ -498,13 +498,34 @@ private:
   void terminateStateRecursively(ExecutionState &state);
   void mergeConstraints(ExecutionState &dependedState, ref<Expr> condition);
   bool isFunctionToSkip(ExecutionState &state, llvm::Function *f);
-  bool canSkipCallSite(ExecutionState &state, llvm::Function *f);
+  // bool canSkipCallSite(ExecutionState &state, llvm::Function *f);
   void bindAll(ExecutionState *state, MemoryObject *mo, bool isLocal, bool zeroMemory);
   void unbindAll(ExecutionState *state, const MemoryObject *mo);
   void forkDependentStates(ExecutionState *trueState, ExecutionState *falseState);
   void mergeConstraintsForAll(ExecutionState &recoveryState, ref<Expr> condition);
   llvm::Function *getSlice(llvm::Function *target, uint32_t sliceId, ModRefAnalysis::SideEffectType type);
   ExecutionState *createSnapshotState(ExecutionState &state);
+
+  // JOR
+  class RecoveryTimer : public Executor::Timer {
+    Executor *executor;
+    Keeper *keeper;
+    llvm::Function* f;
+    const int nr;
+
+  public:
+    RecoveryTimer(Executor *_executor, Keeper *_keeper, llvm::Function* _f)
+     : executor(_executor), keeper(_keeper), f(_f), nr(_keeper->getRecoveriesCount(_f)) {}
+    ~RecoveryTimer() {}
+
+    void run() {
+      if(keeper->getRecoveriesCount(f) == nr) {
+        klee_message("RecoveryTimer invoked, numRecoveries did not change, halting");
+        executor->setHaltExecution(true);
+      }
+    }
+  };
+  RecoveryTimer* newRecoveryTimer(klee::ref<klee::RecoveryInfo> ri);
 
 public:
   Executor(InterpreterOptions &opts, InterpreterHandler *ie);

@@ -341,8 +341,8 @@ namespace {
   // CHASER options
 
   cl::opt<bool>
-  PrintFunctionCalls("print-functions", cl::init(false),
-                     cl::desc("Print function calls (default=off)"));
+  PrintFunctionCalls("print-functions", cl::init(true),
+                     cl::desc("Print function calls (default=on)"));
 
   cl::opt<bool>
   LazySlicing("lazy-slicing", cl::init(true),
@@ -470,7 +470,7 @@ const Module *Executor::setModule(llvm::Module *module,
     skippedTargets = keeper->getSkippedTargets();
 
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, skippedTargets, *logFile);
-    inliner = new Inliner(module, ra, skippedTargets, interpreterOpts.inlinedFunctions, *logFile); // doesn't do anything except if -inline=f is specified
+    inliner = new Inliner(module, ra, skippedTargets, interpreterOpts.inlinedFunctions, *logFile);
     aa = new AAPass();
     aa->setPAType(PointerAnalysis::Andersen_WPA);
 
@@ -1493,6 +1493,8 @@ void Executor::executeCall(ExecutionState &state,
 
         /* TODO: will be replaced later... */
         state.clearRecoveredAddresses();
+
+        keeper->skippingRiskyFunction(/*state, */f);
 
         DEBUG_WITH_TYPE(
           DEBUG_BASIC,
@@ -4456,6 +4458,7 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
 
   ExecutionState *dependentState = state.getDependentState();
   //dumpConstrains(*dependentState);
+  keeper->recoveredFunction(state.getRecoveryInfo()->f);
 
   /* check if we need to run another recovery state */
   if (dependentState->hasPendingRecoveryInfo()) {
@@ -4492,6 +4495,12 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
       recoveryInfo->loadAddr
     )
   );
+
+  // JOR: stats
+  // TODO: make it work in chop legacy too
+  keeper->recoveringFunction(recoveryInfo);
+  // JOR: timer
+  addTimer(newRecoveryTimer(recoveryInfo), 60);
 
   ref<ExecutionState> snapshotState = recoveryInfo->snapshot->state;
 
@@ -4835,19 +4844,9 @@ void Executor::mergeConstraints(ExecutionState &dependentState, ref<Expr> condit
 }
 
 bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
-    // check NotskippedFunctions
+    // keep mode, call keeper
     if(interpreterOpts.skipMode == CHOP_KEEP) {
-      // if(f->getName().startswith(llvm::StringRef("klee_"))) // JOR: TODO: move to proper function
-      //   skipped = false;
-      /*
-      for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
-          if ((*i).name == f->getName().str()) {
-            return false;
-          }
-      }
-      return true;
-      //*/
-      return keeper->isFunctionToSkip(f->getName());
+      return keeper->isFunctionToSkip(f);
     }
     // legacy code - check LegacyskippedFunctions
     else if(interpreterOpts.skipMode == CHOP_LEGACY) {
@@ -5053,4 +5052,10 @@ ExecutionState *Executor::createSnapshotState(ExecutionState &state) {
     snapshotState->clearGuidingConstraints();
 
     return snapshotState;
+}
+
+// JOR
+Executor::RecoveryTimer* Executor::newRecoveryTimer(klee::ref<klee::RecoveryInfo> ri) {
+  // should be called after recoveringFunction
+  return new RecoveryTimer(this, keeper, ri->f);
 }
