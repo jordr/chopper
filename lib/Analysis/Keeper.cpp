@@ -325,14 +325,18 @@ void Keeper::skippingRiskyFunction(llvm::Function* f) {
 }
 
 void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
+  klee::klee_message("recoveringFunction(%s)", ri->f->getName().str().c_str());
   ChopperStats& cs = getOrInsertChopstats(ri->f);
   //cs.numRecoveries++;
+  assert(!cs.recoveryTimer && "recovering a function while recovering it, welp");
   cs.recoveryTimer = new klee::WallTimer();
   // TODO: exploit other RecoveryInfo?
 }
 
 void Keeper::recoveredFunction(llvm::Function* f) {
+  klee::klee_message("recovered(%s)", f->getName().str().c_str());
   ChopperStats& cs = chopstats[f]; // should always exist
+  // if(!cs.recoveryTimer) return; // TODO: JOR: remove this and investigate
   assert(cs.recoveryTimer);
   cs.numRecoveries++; // moved here to have the timer keep track of something
   cs.totalRecoveryTime += cs.recoveryTimer->check();

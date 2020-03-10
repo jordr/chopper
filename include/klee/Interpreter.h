@@ -120,6 +120,8 @@ public:
     bool autoKeep;
     /* @brief Chopper: Additional functions to be kept (does not trigger autokeep) */
     std::vector<SkippedFunctionOption> keptFunctions;
+    /* @brief Chopper: for restarting the analysis */
+    int argc; char** argv;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;

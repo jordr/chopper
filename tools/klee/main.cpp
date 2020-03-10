@@ -1607,6 +1607,8 @@ int main(int argc, char **argv, char **envp) {
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
   IOpts.autoKeep = AutoKeep;
+  IOpts.argc = argc;
+  IOpts.argv = argv;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
   Interpreter *interpreter =
     theInterpreter = Interpreter::create(IOpts, handler);

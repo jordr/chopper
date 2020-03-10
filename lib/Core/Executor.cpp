@@ -4500,7 +4500,7 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
   // TODO: make it work in chop legacy too
   keeper->recoveringFunction(recoveryInfo);
   // JOR: timer
-  addTimer(newRecoveryTimer(recoveryInfo), 60);
+  addTimer(newRecoveryTimer(recoveryInfo), 20); // magic number, in seconds
 
   ref<ExecutionState> snapshotState = recoveryInfo->snapshot->state;
 
@@ -5058,4 +5058,59 @@ ExecutionState *Executor::createSnapshotState(ExecutionState &state) {
 Executor::RecoveryTimer* Executor::newRecoveryTimer(klee::ref<klee::RecoveryInfo> ri) {
   // should be called after recoveringFunction
   return new RecoveryTimer(this, keeper, ri->f);
+}
+
+// JOR
+void Executor::restartExecutionWithFunction(llvm::Function *f) {
+  char** const argv = interpreterOpts.argv;
+  std::string fstr;
+  if (f->getName().str().rfind("__wrap_", 0) == 0) {
+    fstr = f->getName().str().substr(strlen("__wrap_"));
+  }
+  else {
+    fstr = f->getName().str();
+  }
+  
+
+  setHaltExecution(true);
+
+  klee_message("======================================================================");
+  klee_message("RecoveryTimer invoked, recovery of '\e[45;1m%s\e[0m' timed out, restarting", f->getName().str().c_str());
+
+  // reconstruct call string (yikes...)
+  assert(interpreterOpts.skipMode == CHOP_KEEP);
+  std::string Str;
+  llvm::raw_string_ostream CallStr(Str);
+  bool foundTheKeep = false;
+  for(int i = 0; i < interpreterOpts.argc; i++) {
+    std::string argvi = argv[i];
+    if (argvi.rfind("-keep", 0) == 0 || argvi.rfind("--keep", 0) == 0) {
+      // we found the -keep option
+      argvi += "," + fstr;
+      foundTheKeep = true;
+    }
+    else if(!foundTheKeep && i >= 1 && argv[i][0] != '-') {
+      // we reached the end of the non-positional options and -keep was not found
+      // add it
+      argvi = "-keep=" + fstr + " " + argvi;
+      foundTheKeep = true;
+    }
+    CallStr << argvi << ' ';
+  }
+  klee_message("======================================================================"
+    "\n\e[45;1m%s\e[0m", CallStr.str().c_str());
+  klee_message("======================================================================");
+  system(CallStr.str().c_str());
+
+  // llvm::StringMap<llvm::cl::Option*> Map;
+  // llvm::cl::getRegisteredOptions(Map);
+  // for(llvm::StringMapIterator<llvm::cl::Option*> i = Map.begin(); i != Map.end(); i++)
+}
+
+// JOR
+void Executor::RecoveryTimer::run() {
+  if(keeper->getRecoveriesCount(f) == nr) {
+    // executor->setHaltExecution(true);
+    executor->restartExecutionWithFunction(f);
+  }
 }

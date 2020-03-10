@@ -22,7 +22,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
-
+#include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/Twine.h"
 
 #include "klee/Internal/Analysis/Keeper.h"
@@ -518,12 +518,7 @@ private:
      : executor(_executor), keeper(_keeper), f(_f), nr(_keeper->getRecoveriesCount(_f)) {}
     ~RecoveryTimer() {}
 
-    void run() {
-      if(keeper->getRecoveriesCount(f) == nr) {
-        klee_message("RecoveryTimer invoked, numRecoveries did not change, halting");
-        executor->setHaltExecution(true);
-      }
-    }
+    void run();
   };
   RecoveryTimer* newRecoveryTimer(klee::ref<klee::RecoveryInfo> ri);
 
@@ -599,6 +594,9 @@ public:
                                std::map<const std::string*, std::set<unsigned> > &res);
 
   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
+
+  // JOR
+  void restartExecutionWithFunction(llvm::Function *f);
 };
   
 } // End klee namespace
