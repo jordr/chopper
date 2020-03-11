@@ -27,7 +27,7 @@ public:
     std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions,
     std::vector<klee::Interpreter::SkippedFunctionOption>& whitelist,
     bool autoKeep)
-      : module(module), skipMode(skipMode), selectedFunctions(selectedFunctions), whitelist(whitelist), autoKeep(autoKeep) {}
+      : module(module), skipMode(skipMode), selectedFunctions(selectedFunctions), userWhitelist(whitelist), autoKeep(autoKeep) {}
   void run();
 
   inline klee::Interpreter::SkipMode getSkipMode() const
@@ -38,7 +38,12 @@ public:
     { return skippedFunctions; }
   inline const std::vector<std::string>& getSkippedTargets() const
     { return skippedTargets; }
+  inline const std::vector<std::string>& getDynamicWhitelist() const
+    { return dynamicWhitelist; }
+  // @brief check is a function should be skipped, updates whitelist
   bool isFunctionToSkip(llvm::Function* f) ;
+  // @brief return true if whitelist was updated
+  bool updateWhiteList(llvm::Function* f);
   void skippingRiskyFunction(llvm::Function* f);
   void recoveringFunction(klee::ref<klee::RecoveryInfo> ri);
   void recoveredFunction(llvm::Function* f);
@@ -55,13 +60,16 @@ private:
   std::vector<std::string> skippedTargets;
   // @brief Actually skipped functions (redundancy with skippedTargets, adds line info)
   std::vector<klee::Interpreter::SkippedFunctionOption> skippedFunctions;
+  // @brief dynamically built whitelist of functions, only used for restarting for now
+  std::vector<std::string> dynamicWhitelist;
 
+  // below are inputs
   // @brief Chopper mode (legacy, keep, or none)
   klee::Interpreter::SkipMode skipMode;
   // @brief functions selected in interpreterOpts.selectedFunctions
   std::vector<klee::Interpreter::SkippedFunctionOption>& selectedFunctions;
   // @brief whitelist of functions to keep, comes from interpreterOpts as well
-  std::vector<klee::Interpreter::SkippedFunctionOption>& whitelist;
+  std::vector<klee::Interpreter::SkippedFunctionOption>& userWhitelist;
   // @brief Whether autokeep is activated or not (whitelists bad functions, looks for ancestors)
   bool autoKeep;
 
@@ -72,8 +80,10 @@ private:
     int numRecoveries;
     uint64_t totalRecoveryTime;
     klee::WallTimer* recoveryTimer;
+    int recoveryStackCount; // JOR: TODO: we should get rid of this hack
 
-    ChopperStats() : numSkips(0), numRecoveries(0), totalRecoveryTime(0), recoveryTimer(0x0) { }
+    ChopperStats() : numSkips(0), numRecoveries(0), totalRecoveryTime(0), recoveryTimer(0x0), recoveryStackCount(0) { }
+    bool adviseWhitelisting() const;
   };
   std::map<llvm::Function*, ChopperStats> chopstats;
 

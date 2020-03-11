@@ -134,7 +134,7 @@ void Keeper::generateSkippedTargets(const std::set<const Function*>& ancestors) 
       }
     }
     
-    for (auto i = whitelist.begin(), e = whitelist.end(); i != e; i++) {
+    for (auto i = userWhitelist.begin(), e = userWhitelist.end(); i != e; i++) {
       if(i->name == funClass.key) {
         funClass.type = FunctionClass::WHITELIST;
         goto classification_done;
@@ -298,25 +298,44 @@ std::string Keeper::prettifyFilename(llvm::StringRef filename) {
 
 bool Keeper::isFunctionToSkip(llvm::Function* f) {
   llvm::StringRef fname = f->getName();
-  // for variadics
-  if(fname.startswith(llvm::StringRef("__wrap_")))
-    return true;
-  // if it was marked as a function to keep from start
-  if(std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) == skippedTargets.end())
+  // hack for variadics (they are marked as __wrap_ but are not in the SkippedTargets)
+  // we should consider all __wrap_* functions as SkippedTargets anyway
+  if(!fname.startswith(llvm::StringRef("__wrap_"))) {
+    // if it was marked as a function to keep from start
+    if(std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) == skippedTargets.end())
+      // definitely not a function to skip then
+      return false;
+  }
+  // if it is already in the whitelist
+  if(std::find(dynamicWhitelist.begin(), dynamicWhitelist.end(), fname.str()) != dynamicWhitelist.end()) {
     return false;
+  }
   // otherwise, check with heuristics
-  if(chopstats.find(f) != chopstats.end()) {
-    ChopperStats& cs = chopstats[f];
-    klee::klee_message("skipping heuristics: '%s' is %d/%d/%d", 
-      fname.str().c_str(), cs.numSkips, cs.numRecoveries, (int)cs.totalRecoveryTime);
-    if(cs.numRecoveries >= 3) {
-      if(cs.numRecoveries / cs.numSkips >= 2) { // numskips should always be non null
-        klee::klee_message("skipping heuristics: keeping '%s'!", fname.str().c_str());
-        return false;
-      }
-    }
+  if(updateWhiteList(f)) {
+    return false;
   }
   return true;
+}
+
+// return true if whitelist was updated
+bool Keeper::updateWhiteList(llvm::Function* f) {
+  llvm::StringRef fname = f->getName();
+  if(chopstats.find(f) != chopstats.end()) {
+    ChopperStats& cs = chopstats[f];
+    if(cs.adviseWhitelisting()) {
+      klee::klee_message("\e[0;92mskipping heuristics: whitelisting '%s'!\e[0m", fname.str().c_str());
+      dynamicWhitelist.push_back(fname.str());
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Keeper::ChopperStats::adviseWhitelisting() const {
+  klee::klee_message("skipping heuristics: function is %d/%d/%.3f", 
+    /* fname.str().c_str(), */ this->numSkips, this->numRecoveries, (float)this->totalRecoveryTime/1000.f);
+  assert(this->numSkips > 0 && "numskips should always be null at this point");
+  return this->numRecoveries >= 5 && this->numRecoveries / this->numSkips > 3;
 }
 
 void Keeper::skippingRiskyFunction(llvm::Function* f) {
@@ -325,23 +344,30 @@ void Keeper::skippingRiskyFunction(llvm::Function* f) {
 }
 
 void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
-  klee::klee_message("recoveringFunction(%s)", ri->f->getName().str().c_str());
+  // klee::klee_message("recoveringFunction(%s)", ri->f->getName().str().c_str());
   ChopperStats& cs = getOrInsertChopstats(ri->f);
   //cs.numRecoveries++;
-  assert(!cs.recoveryTimer && "recovering a function while recovering it, welp");
-  cs.recoveryTimer = new klee::WallTimer();
+  if(cs.recoveryStackCount == 0) {
+    assert(!cs.recoveryTimer);
+    cs.recoveryTimer = new klee::WallTimer();
+  }
+  cs.recoveryStackCount++;
   // TODO: exploit other RecoveryInfo?
+
+  // JOR: TODO: run some restart heuristics here too
 }
 
 void Keeper::recoveredFunction(llvm::Function* f) {
-  klee::klee_message("recovered(%s)", f->getName().str().c_str());
+  // klee::klee_message("recovered(%s)", f->getName().str().c_str());
   ChopperStats& cs = chopstats[f]; // should always exist
-  // if(!cs.recoveryTimer) return; // TODO: JOR: remove this and investigate
-  assert(cs.recoveryTimer);
+  assert(cs.recoveryTimer && cs.recoveryStackCount);
+  cs.recoveryStackCount--;
+  if(cs.recoveryStackCount == 0) {
+    cs.totalRecoveryTime += cs.recoveryTimer->check();
+    delete cs.recoveryTimer;
+    cs.recoveryTimer = 0x0;
+  }
   cs.numRecoveries++; // moved here to have the timer keep track of something
-  cs.totalRecoveryTime += cs.recoveryTimer->check();
-  delete cs.recoveryTimer;
-  cs.recoveryTimer = 0x0;
 }
 
 /******************************************************************/ 

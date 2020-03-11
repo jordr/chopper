@@ -4458,6 +4458,11 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
 
   ExecutionState *dependentState = state.getDependentState();
   //dumpConstrains(*dependentState);
+  { // JOR: debug
+    std::string prefix;
+    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "< ";
+    klee_message("%s %s", prefix.c_str(), state.getRecoveryInfo()->f->getName().str().c_str());
+  }
   keeper->recoveredFunction(state.getRecoveryInfo()->f);
 
   /* check if we need to run another recovery state */
@@ -4498,6 +4503,11 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
 
   // JOR: stats
   // TODO: make it work in chop legacy too
+  { // JOR: debug
+    std::string prefix;
+    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "> ";
+    klee_message("%s %s", prefix.c_str(), recoveryInfo->f->getName().str().c_str());
+  }
   keeper->recoveringFunction(recoveryInfo);
   // JOR: timer
   addTimer(newRecoveryTimer(recoveryInfo), 20); // magic number, in seconds
@@ -5060,19 +5070,29 @@ Executor::RecoveryTimer* Executor::newRecoveryTimer(klee::ref<klee::RecoveryInfo
   return new RecoveryTimer(this, keeper, ri->f);
 }
 
-// JOR
-void Executor::restartExecutionWithFunction(llvm::Function *f) {
-  char** const argv = interpreterOpts.argv;
-  std::string fstr;
-  if (f->getName().str().rfind("__wrap_", 0) == 0) {
-    fstr = f->getName().str().substr(strlen("__wrap_"));
+// @brief Helper to remove possible wrapper markers in function names
+static std::string unwrap(const std::string& fname) {
+  if (fname.rfind("__wrap_", 0) == 0) {
+    return fname.substr(strlen("__wrap_"));
   }
   else {
-    fstr = f->getName().str();
-  }
-  
+    return fname;
+  } 
+}
 
+// JOR
+// JOR: TODO: craft the -keep from scratch using keeper->userWhitelist and keeper->dynamicWhitelist
+void Executor::restartExecutionWithFunction(llvm::Function *f) {
+  char** const argv = interpreterOpts.argv;
+  // flag for halt
   setHaltExecution(true);
+
+  // add the function that made us restart
+  std::string fstr = unwrap(f->getName().str());
+  // add all the dynamically whitelisted functions too
+  for(auto wfi = keeper->getDynamicWhitelist().begin(); wfi != keeper->getDynamicWhitelist().end(); wfi++) {
+    fstr += "," + unwrap(*wfi);
+  }
 
   klee_message("======================================================================");
   klee_message("RecoveryTimer invoked, recovery of '\e[45;1m%s\e[0m' timed out, restarting", f->getName().str().c_str());
