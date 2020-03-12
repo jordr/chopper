@@ -596,7 +596,7 @@ public:
   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 
   // JOR
-  void restartExecutionWithFunction(llvm::Function *f);
+  void restartExecutionWithFunction(llvm::Function *f, bool singleTimer);
 };
   
 } // End klee namespace

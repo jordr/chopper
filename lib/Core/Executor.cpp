@@ -4509,6 +4509,9 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
     klee_message("%s %s", prefix.c_str(), recoveryInfo->f->getName().str().c_str());
   }
   keeper->recoveringFunction(recoveryInfo);
+  if(keeper->shouldRestartUponRecovery(recoveryInfo->f)) {
+    restartExecutionWithFunction(recoveryInfo->f, false);
+  }
   // JOR: timer
   addTimer(newRecoveryTimer(recoveryInfo), 20); // magic number, in seconds
 
@@ -5082,7 +5085,7 @@ static std::string unwrap(const std::string& fname) {
 
 // JOR
 // JOR: TODO: craft the -keep from scratch using keeper->userWhitelist and keeper->dynamicWhitelist
-void Executor::restartExecutionWithFunction(llvm::Function *f) {
+void Executor::restartExecutionWithFunction(llvm::Function *f, bool singleTimer) {
   char** const argv = interpreterOpts.argv;
   // flag for halt
   setHaltExecution(true);
@@ -5095,7 +5098,10 @@ void Executor::restartExecutionWithFunction(llvm::Function *f) {
   }
 
   klee_message("======================================================================");
-  klee_message("RecoveryTimer invoked, recovery of '\e[45;1m%s\e[0m' timed out, restarting", f->getName().str().c_str());
+  if(singleTimer)
+    klee_message("RecoveryTimer invoked, recovery of '\e[45;1m%s\e[0m' timed out, restarting", f->getName().str().c_str());
+  else
+    klee_message("Cumulative recoveries of '\e[45;1m%s\e[0m' timed out, restarting", f->getName().str().c_str());
 
   // reconstruct call string (yikes...)
   assert(interpreterOpts.skipMode == CHOP_KEEP);
@@ -5118,7 +5124,7 @@ void Executor::restartExecutionWithFunction(llvm::Function *f) {
     CallStr << argvi << ' ';
   }
   klee_message("======================================================================"
-    "\n\e[45;1m%s\e[0m", CallStr.str().c_str());
+    "\nRestarting KLEE with \e[45;1m%s\e[0m", CallStr.str().c_str());
   klee_message("======================================================================");
   system(CallStr.str().c_str());
 
@@ -5131,6 +5137,6 @@ void Executor::restartExecutionWithFunction(llvm::Function *f) {
 void Executor::RecoveryTimer::run() {
   if(keeper->getRecoveriesCount(f) == nr) {
     // executor->setHaltExecution(true);
-    executor->restartExecutionWithFunction(f);
+    executor->restartExecutionWithFunction(f, true);
   }
 }

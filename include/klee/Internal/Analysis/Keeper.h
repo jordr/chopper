@@ -45,7 +45,11 @@ public:
   // @brief return true if whitelist was updated
   bool updateWhiteList(llvm::Function* f);
   void skippingRiskyFunction(llvm::Function* f);
+  // whether the executor should trigger a restart
+  bool shouldRestartUponRecovery(llvm::Function* f);
+  // @brief what to do when recovering a function
   void recoveringFunction(klee::ref<klee::RecoveryInfo> ri);
+  // @brief what to do when done recovering a function
   void recoveredFunction(llvm::Function* f);
     
 private:

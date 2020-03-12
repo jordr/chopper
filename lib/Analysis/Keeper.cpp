@@ -306,11 +306,7 @@ bool Keeper::isFunctionToSkip(llvm::Function* f) {
       // definitely not a function to skip then
       return false;
   }
-  // if it is already in the whitelist
-  if(std::find(dynamicWhitelist.begin(), dynamicWhitelist.end(), fname.str()) != dynamicWhitelist.end()) {
-    return false;
-  }
-  // otherwise, check with heuristics
+  // otherwise, check with whitelist and heuristics
   if(updateWhiteList(f)) {
     return false;
   }
@@ -320,6 +316,17 @@ bool Keeper::isFunctionToSkip(llvm::Function* f) {
 // return true if whitelist was updated
 bool Keeper::updateWhiteList(llvm::Function* f) {
   llvm::StringRef fname = f->getName();
+
+  if(chopstats.find(f) != chopstats.end())
+    klee::klee_message("(((heuristics '%s': \e[0;32m%d/\e[0;31m%d\e[0;37m/%.6f\e[0m)))", 
+      fname.str().c_str(), chopstats[f].numSkips, chopstats[f].numRecoveries, (float)chopstats[f].totalRecoveryTime/1000000.f);
+
+  // if it is already in the whitelist
+  if(std::find(dynamicWhitelist.begin(), dynamicWhitelist.end(), fname.str()) != dynamicWhitelist.end()) {
+    // chopstats[f].adviseWhitelisting(); // TODO: remove, this is just a hack for debugging printing
+    return true;
+  }
+  // otherwise, check with heuristics
   if(chopstats.find(f) != chopstats.end()) {
     ChopperStats& cs = chopstats[f];
     if(cs.adviseWhitelisting()) {
@@ -332,15 +339,25 @@ bool Keeper::updateWhiteList(llvm::Function* f) {
 }
 
 bool Keeper::ChopperStats::adviseWhitelisting() const {
-  klee::klee_message("skipping heuristics: function is %d/%d/%.3f", 
-    /* fname.str().c_str(), */ this->numSkips, this->numRecoveries, (float)this->totalRecoveryTime/1000.f);
   assert(this->numSkips > 0 && "numskips should always be null at this point");
-  return this->numRecoveries >= 5 && this->numRecoveries / this->numSkips > 3;
+  if(this->numRecoveries >= 5 && this->numRecoveries / this->numSkips > 3) {
+    // klee::klee_message("(((heuristics: \e[0;32m%d/\e[0;31m%d\e[0;37m/%.6f\e[0m)))", 
+      // /* fname.str().c_str(), */ this->numSkips, this->numRecoveries, (float)this->totalRecoveryTime/1000000.f);
+    return true;
+  }
+  return false;
 }
 
 void Keeper::skippingRiskyFunction(llvm::Function* f) {
   ChopperStats& cs = getOrInsertChopstats(f);
   cs.numSkips++;
+}
+
+bool Keeper::shouldRestartUponRecovery(llvm::Function* f) {
+  if(chopstats.find(f) == chopstats.end())
+    return false;
+  else
+    return chopstats[f].totalRecoveryTime >= 5*1000000 && chopstats[f].adviseWhitelisting(); // magic value 5s
 }
 
 void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
@@ -352,15 +369,20 @@ void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
     cs.recoveryTimer = new klee::WallTimer();
   }
   cs.recoveryStackCount++;
-  // TODO: exploit other RecoveryInfo?
+  // JOR: TODO: exploit other RecoveryInfo?
 
   // JOR: TODO: run some restart heuristics here too
+  // JOR: TODO: do something smarter here taking in account the time since start
+  updateWhiteList(ri->f); // TODO: JOR: should we do that here?
 }
 
 void Keeper::recoveredFunction(llvm::Function* f) {
-  // klee::klee_message("recovered(%s)", f->getName().str().c_str());
   ChopperStats& cs = chopstats[f]; // should always exist
-  assert(cs.recoveryTimer && cs.recoveryStackCount);
+  // assert(cs.recoveryTimer && cs.recoveryStackCount);
+  if(!(cs.recoveryTimer && cs.recoveryStackCount)) {
+    klee::klee_warning("\e[0;31mrecoveredFunction called twice for a recoveryState!\e[0m");
+    return;
+  }
   cs.recoveryStackCount--;
   if(cs.recoveryStackCount == 0) {
     cs.totalRecoveryTime += cs.recoveryTimer->check();
