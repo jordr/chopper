@@ -46,11 +46,11 @@ public:
   bool updateWhiteList(llvm::Function* f);
   void skippingRiskyFunction(llvm::Function* f);
   // whether the executor should trigger a restart
-  bool shouldRestartUponRecovery(llvm::Function* f);
+  bool shouldRestartUponRecovery(llvm::Function* f, int cumulativeRecoveryTimeThresold);
   // @brief what to do when recovering a function
   void recoveringFunction(klee::ref<klee::RecoveryInfo> ri);
   // @brief what to do when done recovering a function
-  void recoveredFunction(llvm::Function* f);
+  void recoveredFunction(klee::ref<klee::RecoveryInfo> ri);
     
 private:
   void generateAncestors(std::set<const llvm::Function*>& ancestors);
@@ -100,8 +100,14 @@ private:
 
 public:
   // @brief fetches chopstats of f, assumes it exists
-  int getRecoveriesCount(llvm::Function*f) {
+  int getRecoveriesCount(llvm::Function* f) {
     return chopstats[f].numRecoveries;
+  }
+  int getSkipsCount(llvm::Function* f) {
+    return chopstats[f].numSkips;
+  }
+  uint64_t getTotalRecoveryTime(llvm::Function* f) {
+    return chopstats[f].totalRecoveryTime;
   }
 };
 

@@ -122,6 +122,8 @@ public:
     std::vector<SkippedFunctionOption> keptFunctions;
     /* @brief Chopper: for restarting the analysis */
     int argc; char** argv;
+    /* @brief Chopper: autorestart heuristics */
+    int cumulativeRecoveryTimeThresold, singleRecoveryTimeThresold;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
     unsigned int maxErrorCount;

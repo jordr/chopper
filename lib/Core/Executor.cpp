@@ -4175,6 +4175,7 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
     return false;
   }
 
+  #if 0
   // JOR: debugging
   if(PrintFunctionCalls) {
     std::string prefix;
@@ -4187,6 +4188,7 @@ bool Executor::handleMayBlockingLoad(ExecutionState &state, KInstruction *ki,
         klee_message("\e[33m%s %s (recovery)\e[0;m ", prefix.c_str(), (*i)->f->getName().str().c_str());
     }
   }
+  #endif
 
   /* TODO: move to another place? */
   state.pc = state.prevPC;
@@ -4459,11 +4461,15 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
   ExecutionState *dependentState = state.getDependentState();
   //dumpConstrains(*dependentState);
   { // JOR: debug
-    std::string prefix;
-    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "< ";
-    klee_message("%s %s", prefix.c_str(), state.getRecoveryInfo()->f->getName().str().c_str());
+    std::string prefix = dependentState->isRecoveryState() ? "\u2026 " : "";
+    for(unsigned i = 0; i < dependentState->stack.size(); i++) {
+      prefix += dependentState->isRecoveryState() ? "\u25C7 " : "\u25A1 "; // |=|
+    }
+    prefix += "\e[33m";
+    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u2012 "; // —
+    klee_message("%s ", prefix.c_str()); //, state.getRecoveryInfo()->f->getName().str().c_str());
   }
-  keeper->recoveredFunction(state.getRecoveryInfo()->f);
+  keeper->recoveredFunction(state.getRecoveryInfo());
 
   /* check if we need to run another recovery state */
   if (dependentState->hasPendingRecoveryInfo()) {
@@ -4501,21 +4507,42 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
     )
   );
 
+  ref<ExecutionState> snapshotState = recoveryInfo->snapshot->state;
+
   // JOR: stats
-  // TODO: make it work in chop legacy too
-  { // JOR: debug
-    std::string prefix;
-    for(unsigned i = 0; i < state.stack.size(); i++) prefix += "> ";
-    klee_message("%s %s", prefix.c_str(), recoveryInfo->f->getName().str().c_str());
-  }
+  // JOR: TODO: make it work in chop legacy too
   keeper->recoveringFunction(recoveryInfo);
-  if(keeper->shouldRestartUponRecovery(recoveryInfo->f)) {
+  { // JOR: debug
+    std::string prefix = state.isRecoveryState() ? "\u2026 " : ""; // ...
+    for(unsigned i = 0; i < state.stack.size(); i++) {
+      #if 1
+      prefix += state.isRecoveryState() ? "\u25C7 " : "\u25A1 "; // |=|
+      #else
+      prefix += "\u25A1\e[7m";
+      prefix += state.stack[i].kf->function->getName().str().substr(0,15);
+      prefix += "\e[0m ";
+      #endif
+    }
+    prefix += "\e[33m";
+    for(unsigned i = 0; i < snapshotState->stack.size(); i++) {
+      #if 1
+      prefix += "\u25C6 "; // |> 
+      #else
+      prefix += "\u25C6\e[7m";
+      prefix += snapshotState->stack[i].kf->function->getName().str().substr(0,15);
+      prefix += "\e[7m ";
+      #endif
+    }
+    klee_message("%s %s \e[0m[\e[0;32m%d/\e[0;31m%d\e[0m/%.6f]", prefix.c_str(), recoveryInfo->f->getName().str().c_str(),
+      keeper->getSkipsCount(recoveryInfo->f), keeper->getRecoveriesCount(recoveryInfo->f), (float)keeper->getTotalRecoveryTime(recoveryInfo->f)/1000000.f);
+  }
+  if(keeper->shouldRestartUponRecovery(recoveryInfo->f, interpreterOpts.cumulativeRecoveryTimeThresold)) {
     restartExecutionWithFunction(recoveryInfo->f, false);
   }
-  // JOR: timer
-  addTimer(newRecoveryTimer(recoveryInfo), 20); // magic number, in seconds
-
-  ref<ExecutionState> snapshotState = recoveryInfo->snapshot->state;
+  else { // prevents weird double restarts?
+    // JOR: timer
+    addTimer(newRecoveryTimer(recoveryInfo), interpreterOpts.singleRecoveryTimeThresold); // magic number, in seconds
+  }
 
   /* TODO: non-first snapshots hold normal state properties! */
 

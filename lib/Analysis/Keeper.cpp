@@ -310,16 +310,17 @@ bool Keeper::isFunctionToSkip(llvm::Function* f) {
   if(updateWhiteList(f)) {
     return false;
   }
-  return true;
+  else {
+    if(chopstats.find(f) != chopstats.end())
+      klee::klee_message("(((heuristics '%s': \e[0;32m%d/\e[0;31m%d\e[0;37m/%.6f\e[0m)))", 
+        fname.str().c_str(), chopstats[f].numSkips, chopstats[f].numRecoveries, (float)chopstats[f].totalRecoveryTime/1000000.f);
+    return true;
+  }
 }
 
-// return true if whitelist was updated
+// return true if function should be kept
 bool Keeper::updateWhiteList(llvm::Function* f) {
   llvm::StringRef fname = f->getName();
-
-  if(chopstats.find(f) != chopstats.end())
-    klee::klee_message("(((heuristics '%s': \e[0;32m%d/\e[0;31m%d\e[0;37m/%.6f\e[0m)))", 
-      fname.str().c_str(), chopstats[f].numSkips, chopstats[f].numRecoveries, (float)chopstats[f].totalRecoveryTime/1000000.f);
 
   // if it is already in the whitelist
   if(std::find(dynamicWhitelist.begin(), dynamicWhitelist.end(), fname.str()) != dynamicWhitelist.end()) {
@@ -353,11 +354,12 @@ void Keeper::skippingRiskyFunction(llvm::Function* f) {
   cs.numSkips++;
 }
 
-bool Keeper::shouldRestartUponRecovery(llvm::Function* f) {
+bool Keeper::shouldRestartUponRecovery(llvm::Function* f, int CumulativeRecoveryTimeThresold) {
   if(chopstats.find(f) == chopstats.end())
     return false;
-  else
-    return chopstats[f].totalRecoveryTime >= 5*1000000 && chopstats[f].adviseWhitelisting(); // magic value 5s
+  if(chopstats[f].totalRecoveryTime < CumulativeRecoveryTimeThresold*1000000) // magic value default 5s
+    return false;
+  return chopstats[f].adviseWhitelisting();
 }
 
 void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
@@ -376,8 +378,8 @@ void Keeper::recoveringFunction(klee::ref<klee::RecoveryInfo> ri) {
   updateWhiteList(ri->f); // TODO: JOR: should we do that here?
 }
 
-void Keeper::recoveredFunction(llvm::Function* f) {
-  ChopperStats& cs = chopstats[f]; // should always exist
+void Keeper::recoveredFunction(klee::ref<klee::RecoveryInfo> ri) {
+  ChopperStats& cs = chopstats[ri->f]; // should always exist
   // assert(cs.recoveryTimer && cs.recoveryStackCount);
   if(!(cs.recoveryTimer && cs.recoveryStackCount)) {
     klee::klee_warning("\e[0;31mrecoveredFunction called twice for a recoveryState!\e[0m");

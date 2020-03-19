@@ -102,6 +102,16 @@ namespace {
            cl::desc("Automatically tag some functions (libc...) for keeping"),
            cl::init(true));
 
+  cl::opt<unsigned int>
+  SingleRecoveryTimeThresold ("longest-single-recovery",
+                cl::desc("thresold of time (seconds) a single recovery may take"),
+                cl::init(20));
+
+  cl::opt<unsigned int>
+  CumulativeRecoveryTimeThresold("longest-cumulative-recovery",
+                cl::desc("thresold of time (seconds) several recoveries to a function may take, alongside with bad efficiency"),
+                cl::init(5));
+
   cl::opt<std::string>
   InlinedFunctions("inline",
                    cl::desc("Comma-separated list of functions to be inlined (e.g. <function1>,<function2>,..)"),
@@ -1607,6 +1617,8 @@ int main(int argc, char **argv, char **envp) {
   IOpts.errorLocations = errorLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
   IOpts.autoKeep = AutoKeep;
+  IOpts.cumulativeRecoveryTimeThresold = CumulativeRecoveryTimeThresold;
+  IOpts.singleRecoveryTimeThresold = SingleRecoveryTimeThresold;
   IOpts.argc = argc;
   IOpts.argv = argv;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
