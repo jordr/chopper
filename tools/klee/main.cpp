@@ -1286,10 +1286,11 @@ bool parseNameLineOption(
 }
 
 void BetterLLVMDebugFiltering() {
-  if (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY_VERBOSE)) {
-    ::llvm::setCurrentDebugType(DEBUG_RECOVERY);
-    ::llvm::setCurrentDebugType(DEBUG_RECOVERY_TIMERS);
-  }
+  // this doesn't work
+  // if (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY_VERBOSE)) {
+  //   ::llvm::setCurrentDebugType(DEBUG_RECOVERY);
+  //   ::llvm::setCurrentDebugType(DEBUG_RECOVERY_TIMERS);
+  // }
 }
 
 void parseSkippingParameter(

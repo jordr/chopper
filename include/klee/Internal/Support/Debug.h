@@ -28,7 +28,7 @@
 #define DEBUG_SIGNATURES "signatures"
 // AutoChopper
 #define DEBUG_RECOVERY "recovery"
-    #define DEBUG_RECOVERY_VERBOSE "recovery-verbose"
-    #define DEBUG_RECOVERY_TIMERS "recovery-timers"
+    #define DEBUG_RECOVERY_VERBOSE "recovery2"
+    #define DEBUG_RECOVERY_TIMERS "recoverytimers"
 
 #endif

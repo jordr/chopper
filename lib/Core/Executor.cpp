@@ -1396,9 +1396,13 @@ void Executor::executeCall(ExecutionState &state,
           klee_message("%s %s", prefix.c_str(), fstr.c_str());
       }
       else {
-        DEBUG_WITH_TYPE(DEBUG_RECOVERY_VERBOSE, klee_message("%s %s", prefix.c_str(), fstr.c_str()));
-        if(/* breakOnSyscallRecovery && */ f->getName() == "syscall")
-          klee_error("call to syscall during recovery, -posix-runtime may break");
+        DEBUG_WITH_TYPE("recovery2", klee_message("%s %s", prefix.c_str(), fstr.c_str()));
+        if(/* breakOnSyscallRecovery && */ f->getName() == "syscall") {
+          std::string stackstr;
+          for(unsigned i = 0; i < state.stack.size(); i++)
+            stackstr += state.stack[i].kf->function->getName().str() += " -> ";
+          klee_error("call to syscall during recovery, -posix-runtime may break. Call stack is: '%s'", stackstr.c_str());
+        }
       }
     }
     else // shouldn't happen
