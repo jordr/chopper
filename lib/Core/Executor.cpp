@@ -1389,15 +1389,17 @@ void Executor::executeCall(ExecutionState &state,
     if(f) {
       DEBUG_WITH_TYPE("instcount", llvm::errs() << "\n";);
       std::string fstr = !f->isVarArg() ? f->getName().str() : std::string(f->getName().str() + "(...)");
-      if(!state.isRecoveryState())
-      {
+      if(!state.isRecoveryState()) {
         if(isFunctionToSkip(state, f))
           klee_message("\e[2m%s %s (skipped)\e[0;m", prefix.c_str(), fstr.c_str());
         else 
           klee_message("%s %s", prefix.c_str(), fstr.c_str());
       }
-      else
-        DEBUG_WITH_TYPE("recovery", klee_message("%s %s", prefix.c_str(), fstr.c_str()));
+      else {
+        DEBUG_WITH_TYPE(DEBUG_RECOVERY_VERBOSE, klee_message("%s %s", prefix.c_str(), fstr.c_str()));
+        if(/* breakOnSyscallRecovery && */ f->getName() == "syscall")
+          klee_error("call to syscall during recovery, -posix-runtime may break");
+      }
     }
     else // shouldn't happen
       klee_message("\e[0;31m%s ?????\e[0;m", prefix.c_str());
@@ -4463,11 +4465,11 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
   { // JOR: debug
     std::string prefix = dependentState->isRecoveryState() ? "\u2026 " : "";
     for(unsigned i = 0; i < dependentState->stack.size(); i++) {
-      prefix += dependentState->isRecoveryState() ? "\u25C7 " : "\u25A1 "; // |=|
+      prefix += dependentState->isRecoveryState() ? "\u25C7 " : "\u25A1 "; // diamond or |=|
     }
     prefix += "\e[33m";
     for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u2012 "; // —
-    klee_message("%s ", prefix.c_str()); //, state.getRecoveryInfo()->f->getName().str().c_str());
+    DEBUG_WITH_TYPE(DEBUG_RECOVERY, klee_message("%s ", prefix.c_str())); //, state.getRecoveryInfo()->f->getName().str().c_str());
   }
   keeper->recoveredFunction(state.getRecoveryInfo());
 
@@ -4533,8 +4535,10 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
       prefix += "\e[7m ";
       #endif
     }
-    klee_message("%s %s \e[0m[\e[0;32m%d/\e[0;31m%d\e[0m/%.6f]", prefix.c_str(), recoveryInfo->f->getName().str().c_str(),
-      keeper->getSkipsCount(recoveryInfo->f), keeper->getRecoveriesCount(recoveryInfo->f), (float)keeper->getTotalRecoveryTime(recoveryInfo->f)/1000000.f);
+    if(!state.isRecoveryState() || (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY))) {
+      klee_message("%s %s \e[0m[\e[0;32m%d/\e[0;31m%d\e[0m/%.6f]", prefix.c_str(), recoveryInfo->f->getName().str().c_str(),
+        keeper->getSkipsCount(recoveryInfo->f), keeper->getRecoveriesCount(recoveryInfo->f), (float)keeper->getTotalRecoveryTime(recoveryInfo->f)/1000000.f);
+    }
   }
   if(keeper->shouldRestartUponRecovery(recoveryInfo->f, interpreterOpts.cumulativeRecoveryTimeThresold)) {
     restartExecutionWithFunction(recoveryInfo->f, false);

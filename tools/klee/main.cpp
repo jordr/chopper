@@ -1285,6 +1285,13 @@ bool parseNameLineOption(
     return true;
 }
 
+void BetterLLVMDebugFiltering() {
+  if (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY_VERBOSE)) {
+    ::llvm::setCurrentDebugType(DEBUG_RECOVERY);
+    ::llvm::setCurrentDebugType(DEBUG_RECOVERY_TIMERS);
+  }
+}
+
 void parseSkippingParameter(
     Module *module,
     std::string parameter,
@@ -1538,6 +1545,9 @@ int main(int argc, char **argv, char **envp) {
     }
   if(!WarningFilterVector.empty())
     klee::klee_warning_filter = &WarningFilterVector;
+  
+  // JOR
+  BetterLLVMDebugFiltering();
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;
