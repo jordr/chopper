@@ -1396,7 +1396,7 @@ void Executor::executeCall(ExecutionState &state,
           klee_message("%s %s", prefix.c_str(), fstr.c_str());
       }
       else {
-        DEBUG_WITH_TYPE("recovery2", klee_message("%s %s", prefix.c_str(), fstr.c_str()));
+        DEBUG_CHOPPER(DEBUG_RECOVERY_VERBOSE, klee_message("%s %s", prefix.c_str(), fstr.c_str()));
         if(/* breakOnSyscallRecovery && */ f->getName() == "syscall") {
           std::string stackstr;
           for(unsigned i = 0; i < state.stack.size(); i++)
@@ -4523,7 +4523,7 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
     for(unsigned i = 0; i < state.stack.size(); i++) {
       #if 1
       prefix += state.isRecoveryState() ? "\u25C7 " : "\u25A1 "; // |=|
-      #else
+      #else // for detailed debugging
       prefix += "\u25A1\e[7m";
       prefix += state.stack[i].kf->function->getName().str().substr(0,15);
       prefix += "\e[0m ";
@@ -4533,7 +4533,7 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
     for(unsigned i = 0; i < snapshotState->stack.size(); i++) {
       #if 1
       prefix += "\u25C6 "; // |> 
-      #else
+      #else // for detailed debugging
       prefix += "\u25C6\e[7m";
       prefix += snapshotState->stack[i].kf->function->getName().str().substr(0,15);
       prefix += "\e[7m ";

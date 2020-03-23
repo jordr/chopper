@@ -337,7 +337,7 @@ bool Slicer::buildDG()
     //pa->run();
 
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Points-to analysis took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Points-to analysis took"));
 
     dg.build(M, PTA, M->getFunction(entryFunction));
 
@@ -423,7 +423,7 @@ bool Slicer::mark()
     }
 
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Finding dependent nodes took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Finding dependent nodes took"));
 
     return true;
 }
@@ -437,19 +437,19 @@ void Slicer::computeEdges()
     tm.start();
     RD->run();
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Reaching defs analysis took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Reaching defs analysis took"));
 
     LLVMDefUseAnalysis DUA(&dg, RD.get(), PTA, undefined_are_pure);
     tm.start();
     DUA.run(); // add def-use edges according that
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Adding Def-Use edges took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Adding Def-Use edges took"));
 
     tm.start();
     // add post-dominator frontiers
     dg.computeControlDependencies(CdAlgorithm);
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Computing control dependencies took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Computing control dependencies took"));
 }
 
 bool Slicer::slice()
@@ -469,10 +469,10 @@ bool Slicer::slice()
     slicer.slice(&dg, nullptr, slice_id);
 
     tm.stop();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Slicing dependence graph took"));
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Slicing dependence graph took"));
 
     analysis::SlicerStatistics& st = slicer.getStatistics();
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY_TIMERS, errs() << "INFO: Sliced away " << st.nodesRemoved
+    DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, errs() << "INFO: Sliced away " << st.nodesRemoved
         << " from " << st.nodesTotal << " nodes in DG\n");
 
     return true;

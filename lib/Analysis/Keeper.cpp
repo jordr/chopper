@@ -383,6 +383,7 @@ void Keeper::recoveredFunction(klee::ref<klee::RecoveryInfo> ri) {
   // assert(cs.recoveryTimer && cs.recoveryStackCount);
   if(!(cs.recoveryTimer && cs.recoveryStackCount)) {
     klee::klee_warning("\e[0;31mrecoveredFunction called twice for a recoveryState!\e[0m");
+    assert(false);
     return;
   }
   cs.recoveryStackCount--;
