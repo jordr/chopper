@@ -221,6 +221,15 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
             pair<Function *, NodeID> k = make_pair(f, FInodeId);
             objToStoreMap[k].insert(store);
             modPts.set(FInodeId);
+
+            std::string infoStr, storeStr;
+            llvm::raw_string_ostream infoSS(infoStr), storeSS(storeStr);
+            infoSS << *storeLocation.Ptr;
+            storeSS << *store;
+            klee::klee_warning(
+                "Detected field-sensitive information '%s' used by store '%s', adding field-insensitive info.", 
+                infoSS.str().c_str(),
+                storeSS.str().c_str());
         }
 
         /* TODO: check static objects? */

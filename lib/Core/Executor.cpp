@@ -1401,7 +1401,7 @@ void Executor::executeCall(ExecutionState &state,
           std::string stackstr;
           for(unsigned i = 0; i < state.stack.size(); i++)
             stackstr += state.stack[i].kf->function->getName().str() += " -> ";
-          klee_error("call to syscall during recovery, -posix-runtime may break. Call stack is: '%s'", stackstr.c_str());
+          klee_warning("call to syscall during recovery, -posix-runtime may break. Call stack is: '%s'", stackstr.c_str());
         }
       }
     }
