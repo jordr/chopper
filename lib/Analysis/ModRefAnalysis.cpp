@@ -189,9 +189,8 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
         for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
             NodeID nodeId = *i;
             /* get allocation site */
-            PAGNode *pagNode = aa->getPTA()->getPAG()->getPAGNode(nodeId);
             assert(llvm::isa<ObjPN>(aa->getPTA()->getPAG()->getPAGNode(nodeId)));
-            int insensitive =  aa->getPTA()->getFIObjNode(nodeId) == nodeId;
+            bool insensitive =  aa->getPTA()->getFIObjNode(nodeId) == nodeId;
             if(insensitive) {
                 debugs << "\t\t" << nodeId << "(" << "insensitive" << "), ";
             } else {
@@ -225,7 +224,6 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
 
         pair<Function *, NodeID> k = make_pair(f, nodeId);
         objToStoreMap[k].insert(store);
-        debugs << "objToStoreMap[" << f->getName() << ", " << nodeId << "]" << " = " << *store << "\n";
         modPts.set(nodeId);
     }
 }
