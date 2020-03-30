@@ -4467,13 +4467,13 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
   ExecutionState *dependentState = state.getDependentState();
   //dumpConstrains(*dependentState);
   { // JOR: debug
-    std::string prefix = dependentState->isRecoveryState() ? "\u2026 " : "";
+    std::string prefix = state.isRecoveryState() && state.getLevel() ? "[L" + std::to_string(state.getLevel()) + "] " : ""; // display recovery level
     for(unsigned i = 0; i < dependentState->stack.size(); i++) {
       prefix += dependentState->isRecoveryState() ? "\u25C7 " : "\u25A1 "; // diamond or |=|
     }
     prefix += "\e[33m";
     for(unsigned i = 0; i < state.stack.size(); i++) prefix += "\u2012 "; // —
-    DEBUG_WITH_TYPE(DEBUG_RECOVERY, klee_message("%s ", prefix.c_str())); //, state.getRecoveryInfo()->f->getName().str().c_str());
+    DEBUG_CHOPPER(DEBUG_RECOVERY, klee_message("%s ", prefix.c_str())); //, state.getRecoveryInfo()->f->getName().str().c_str());
   }
   keeper->recoveredFunction(state.getRecoveryInfo());
 
@@ -4519,7 +4519,7 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
   // JOR: TODO: make it work in chop legacy too
   keeper->recoveringFunction(recoveryInfo);
   { // JOR: debug
-    std::string prefix = state.isRecoveryState() ? "\u2026 " : ""; // ...
+    std::string prefix = state.isRecoveryState() && state.getLevel() ? "[L" + std::to_string(state.getLevel()) + "] " : ""; // display recovery level
     for(unsigned i = 0; i < state.stack.size(); i++) {
       #if 1
       prefix += state.isRecoveryState() ? "\u25C7 " : "\u25A1 "; // |=|
@@ -4539,9 +4539,12 @@ void Executor::startRecoveryState(ExecutionState &state, ref<RecoveryInfo> recov
       prefix += "\e[7m ";
       #endif
     }
-    if(!state.isRecoveryState() || (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY))) {
-      klee_message("%s %s \e[0m[\e[0;32m%d/\e[0;31m%d\e[0m/%.6f]", prefix.c_str(), recoveryInfo->f->getName().str().c_str(),
-        keeper->getSkipsCount(recoveryInfo->f), keeper->getRecoveriesCount(recoveryInfo->f), (float)keeper->getTotalRecoveryTime(recoveryInfo->f)/1000000.f);
+    #define DEBUG_TODO() klee_message("%s %s \e[0m[\e[0;32m%d/\e[0;31m%d\e[0m/%.6f] (recovery)", prefix.c_str(), recoveryInfo->f->getName().str().c_str(),\
+        keeper->getSkipsCount(recoveryInfo->f), keeper->getRecoveriesCount(recoveryInfo->f), (float)keeper->getTotalRecoveryTime(recoveryInfo->f)/1000000.f)
+    if(!state.isRecoveryState()) {
+      DEBUG_TODO();
+    } else {
+      DEBUG_CHOPPER(DEBUG_RECOVERY, DEBUG_TODO());
     }
   }
   if(keeper->shouldRestartUponRecovery(recoveryInfo->f, interpreterOpts.cumulativeRecoveryTimeThresold)) {

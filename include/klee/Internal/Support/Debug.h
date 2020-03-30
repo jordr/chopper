@@ -27,9 +27,12 @@
 #define DEBUG_BASIC "basic"
 #define DEBUG_SIGNATURES "signatures"
 // AutoChopper
-#define DEBUG_RECOVERY "recovery"
-#define DEBUG_RECOVERY_VERBOSE "recovery2", "recovery"
-#define DEBUG_RECOVERY_TIMERS "recoverytimers", "recovery"
+#define DEBUG_CHOP "chop"
+#define DEBUG_RECOVERY "recovery", "recoverytimers", "recovery2", "basic"
+#define DEBUG_RECOVERY_VERBOSE "recovery2"
+#define DEBUG_RECOVERY_TIMERS "recoverytimers"
+#define DEBUG_INSTCOUNT "instcount"
+#define DEBUG_MODREF "modref"
 #endif
 
 // define DEBUG_CHOPPER

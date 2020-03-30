@@ -357,7 +357,7 @@ void Keeper::skippingRiskyFunction(llvm::Function* f) {
 bool Keeper::shouldRestartUponRecovery(llvm::Function* f, int CumulativeRecoveryTimeThresold) {
   if(chopstats.find(f) == chopstats.end())
     return false;
-  if(chopstats[f].totalRecoveryTime < CumulativeRecoveryTimeThresold*1000000) // magic value default 5s
+  if(chopstats[f].totalRecoveryTime < uint64_t(CumulativeRecoveryTimeThresold)*1000000) // magic value default 5s
     return false;
   return chopstats[f].adviseWhitelisting();
 }
@@ -383,7 +383,6 @@ void Keeper::recoveredFunction(klee::ref<klee::RecoveryInfo> ri) {
   // assert(cs.recoveryTimer && cs.recoveryStackCount);
   if(!(cs.recoveryTimer && cs.recoveryStackCount)) {
     klee::klee_warning("\e[0;31mrecoveredFunction called twice for a recoveryState!\e[0m");
-    assert(false);
     return;
   }
   cs.recoveryStackCount--;

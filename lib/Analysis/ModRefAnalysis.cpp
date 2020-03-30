@@ -20,6 +20,7 @@
 #include "klee/Internal/Analysis/AAPass.h"
 #include "klee/Internal/Analysis/ModRefAnalysis.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/Internal/Support/Debug.h"
 
 using namespace std;
 using namespace llvm;
@@ -93,12 +94,14 @@ void ModRefAnalysis::run() {
     computeModInfoToStoreMap();
 
     /* debug */
-    //dumpModSetMap();
-    //dumpDependentLoads();
-    //dumpLoadToModInfoMap();
-    //dumpModInfoToStoreMap();
-    //dumpModInfoToIdMap();
-    //dumpOverridingStores();
+    DEBUG_CHOPPER(DEBUG_MODREF, {
+        dumpModSetMap();
+        dumpDependentLoads();
+        dumpLoadToModInfoMap();
+        dumpModInfoToStoreMap();
+        dumpModInfoToIdMap();
+        dumpOverridingStores();
+    });
 }
 
 ModRefAnalysis::ModInfoToStoreMap &ModRefAnalysis::getModInfoToStoreMap() {
@@ -163,6 +166,7 @@ void ModRefAnalysis::collectModInfo(Function *entry) {
             Instruction *inst = &*j;
             if (inst->getOpcode() == Instruction::Store) {
                 addStore(entry, inst);
+                // debugs << "addStore(" << entry->getName().str() << ", " << *inst << ");\n";
             } 
         }
     }
@@ -171,13 +175,32 @@ void ModRefAnalysis::collectModInfo(Function *entry) {
     cache.clear();
 }
 
-void ModRefAnalysis::addStore(
-    Function *f,
-    Instruction *store
-) {
+void ModRefAnalysis::addStore(Function *f, Instruction *store) {
     AliasAnalysis::Location storeLocation = getStoreLocation(dyn_cast<StoreInst>(store));
     NodeID id = aa->getPTA()->getPAG()->getValueNode(storeLocation.Ptr);
     PointsTo &pts = aa->getPTA()->getPts(id);
+
+    DEBUG_CHOPPER(DEBUG_MODREF,
+        debugs << "STORE: {\n"
+            << "\tlocation = " << *storeLocation.Ptr << ",\n"
+            << "\tinstruction = " << *store << "\n"
+            << "\tValueNodeID = " << id << ",\n"
+            << "\tptsto = [";
+        for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
+            NodeID nodeId = *i;
+            /* get allocation site */
+            PAGNode *pagNode = aa->getPTA()->getPAG()->getPAGNode(nodeId);
+            assert(llvm::isa<ObjPN>(aa->getPTA()->getPAG()->getPAGNode(nodeId)));
+            int insensitive =  aa->getPTA()->getFIObjNode(nodeId) == nodeId;
+            if(insensitive) {
+                debugs << "\t\t" << nodeId << "(" << "insensitive" << "), ";
+            } else {
+                debugs << "\t\t" << nodeId << "(" << "sensitive, "
+                    << "FIObjNode = " << aa->getPTA()->getFIObjNode(nodeId) << "), ";
+            }
+        }
+        debugs << "]\n}\n";
+    );
 
     PointsTo &modPts = modPtsMap[f];
 
@@ -202,6 +225,7 @@ void ModRefAnalysis::addStore(
 
         pair<Function *, NodeID> k = make_pair(f, nodeId);
         objToStoreMap[k].insert(store);
+        debugs << "objToStoreMap[" << f->getName() << ", " << nodeId << "]" << " = " << *store << "\n";
         modPts.set(nodeId);
     }
 }
@@ -274,7 +298,20 @@ void ModRefAnalysis::collectRefInfo(Function *entry) {
 void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
     AliasAnalysis::Location loadLocation = getLoadLocation(dyn_cast<LoadInst>(load));
     NodeID id = aa->getPTA()->getPAG()->getValueNode(loadLocation.Ptr);
+
     PointsTo &pts = aa->getPTA()->getPts(id);
+
+    DEBUG_CHOPPER(DEBUG_MODREF,
+        debugs << "LOAD: {\n"
+            << "\tlocation = " << *loadLocation.Ptr << ",\n"
+            << "\tinstruction = " << *load << "\n"
+            << "\tValueNodeID = " << id << ",\n"
+            << "\tptsto = [";
+        for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
+            debugs << *i << ", ";
+        }
+        debugs << "]\n}\n";
+    );
 
     PointsTo &refPts = refPtsMap[f];
     refPts |= pts;
@@ -304,6 +341,15 @@ void ModRefAnalysis::computeModRefInfo() {
 
         /* get the corresponding ref-set */
         PointsTo &refPts = refPtsMap[f];
+
+        debugs << "function = " << f->getName().str() << "\n";
+        for (PointsTo::iterator ni = modPts.begin(); ni != modPts.end(); ++ni) {
+            debugs << "\t-modPts: " << *ni;
+        } debugs << "\n";
+        for (PointsTo::iterator ni = refPts.begin(); ni != refPts.end(); ++ni) {
+            debugs << "\t-refPts: " << *ni;
+        } debugs << "\n";
+
         /* compute the intersection */
         PointsTo pts = modPts & refPts;
         /* get the corresponding modifies-set */
@@ -318,6 +364,10 @@ void ModRefAnalysis::computeModRefInfo() {
             /* update modifies-set */
             InstructionSet &stores = objToStoreMap[k];
             modSet.insert(stores.begin(), stores.end());
+            debugs << "modSet of " << f->getName().str() << ", " << nodeId << " =\n";
+            for(InstructionSet::iterator stori = stores.begin(); stori != stores.end(); stori++) {
+                debugs << "\t-" << **stori << "\n";
+            }
 
             /* get allocation site */
             AllocSite allocSite = getAllocSite(nodeId);
