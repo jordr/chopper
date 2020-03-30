@@ -214,6 +214,15 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
             assert(false);
         }
 
+        // JOR: if nodeId is field-sensitive, add field-insensitive info too
+        bool insensitive = aa->getPTA()->getFIObjNode(nodeId) == nodeId;
+        if(!insensitive) {
+            NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
+            pair<Function *, NodeID> k = make_pair(f, FInodeId);
+            objToStoreMap[k].insert(store);
+            modPts.set(FInodeId);
+        }
+
         /* TODO: check static objects? */
         if (obj->getMemObj()->isStack()) {
             const Value *value = obj->getMemObj()->getRefVal();
