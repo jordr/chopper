@@ -86,7 +86,7 @@ namespace {
                "(e.g. <function1>[:line],<function2>[:line],..)"));
 
   cl::opt<std::string> LegacySkippedFunctions(
-      "skip-functions-legacy",
+      "skip-functions",
       cl::desc("Comma-separated list of functions to skip. "
                "Optionally, a line number can be specified to choose a specific call site "
                "(e.g. <function1>[:line],<function2>[:line],..)"));
@@ -1285,14 +1285,6 @@ bool parseNameLineOption(
     return true;
 }
 
-void BetterLLVMDebugFiltering() {
-  // this doesn't work
-  // if (::llvm::DebugFlag && ::llvm::isCurrentDebugType(DEBUG_RECOVERY_VERBOSE)) {
-  //   ::llvm::setCurrentDebugType(DEBUG_RECOVERY);
-  //   ::llvm::setCurrentDebugType(DEBUG_RECOVERY_TIMERS);
-  // }
-}
-
 void parseSkippingParameter(
     Module *module,
     std::string parameter,
@@ -1546,9 +1538,6 @@ int main(int argc, char **argv, char **envp) {
     }
   if(!WarningFilterVector.empty())
     klee::klee_warning_filter = &WarningFilterVector;
-  
-  // JOR
-  BetterLLVMDebugFiltering();
 
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsNot;
   std::vector<Interpreter::SkippedFunctionOption> skippingOptionsLegacy;

@@ -252,7 +252,7 @@ classification_done:
     }
   }
 
-  klee::klee_message("Equivalent legacy command:  --skip-functions-legacy=%s", legacyEquivalentCmd.c_str());
+  klee::klee_message("Equivalent legacy command: --skip-functions=%s", legacyEquivalentCmd.c_str());
   	
   // Check that __user_main is kept
   if(std::find(skippedTargets.begin(), skippedTargets.end(), "__user_main") != skippedTargets.end())

@@ -62,20 +62,19 @@ static void klee_vfmessage(FILE *fp, const char *pfx, const char *msg,
 
   // JOR
   unsigned hash = klee_cstrhash(msg)%0xffffff;
-  if(
-      // pfx && !strcmp(pfx, warningPrefix) // is a warning
-      klee::klee_warning_filter // warning filter is active
-      && (std::find(klee_warning_filter->begin(), klee_warning_filter->end(), hash) != klee_warning_filter->end()) // filtered
-    )
-    return;
+  if(klee::klee_warning_filter) {
+    // warning filter is active
+    if(std::find(klee_warning_filter->begin(), klee_warning_filter->end(), hash) != klee_warning_filter->end()) // filtered
+      return;
 
-  fdos.changeColor(llvm::raw_ostream::BLACK, false, true);
-  fdos.changeColor(llvm::raw_ostream::BLACK, false, false);
-  fdos << "[";
-  fdos.write_hex(klee_cstrhash(msg)%0xffffff);
-  fdos << "]";
-  fdos.resetColor();
-  fdos << " ";
+    fdos.changeColor(llvm::raw_ostream::BLACK, false, true);
+    fdos.changeColor(llvm::raw_ostream::BLACK, false, false);
+    fdos << "[";
+    fdos.write_hex(klee_cstrhash(msg)%0xffffff);
+    fdos << "]";
+    fdos.resetColor();
+    fdos << " ";
+  }
 
   bool modifyConsoleColor = fdos.is_displayed() && (fp == stderr);
 
