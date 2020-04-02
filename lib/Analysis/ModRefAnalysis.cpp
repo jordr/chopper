@@ -223,10 +223,10 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
             llvm::raw_string_ostream infoSS(infoStr), storeSS(storeStr);
             infoSS << *storeLocation.Ptr;
             storeSS << *store;
-            klee::klee_warning(
-                "Detected field-sensitive information '%s' used by store '%s', adding field-insensitive info.", 
-                infoSS.str().c_str(),
-                storeSS.str().c_str());
+            // klee::klee_warning(
+            //     "Detected field-sensitive information '%s' used by store '%s', adding field-insensitive info.", 
+            //     infoSS.str().c_str(),
+            //     storeSS.str().c_str());
         }
 
         /* TODO: check static objects? */

@@ -461,12 +461,14 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler = new SpecialFunctionHandler(*this);
   specialFunctionHandler->prepare();
 
+  logFile = interpreterHandler->openOutputFile("sa.log");
+  
+  /* build target functions */
+  std::vector<std::string> skippedTargets;
+  keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.keptFunctions, interpreterOpts.autoKeep);
+  keeper->run();
+
   if (interpreterOpts.skipMode != CHOP_NONE) {
-    logFile = interpreterHandler->openOutputFile("sa.log");
-    /* build target functions */
-    std::vector<std::string> skippedTargets;
-    keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.keptFunctions, interpreterOpts.autoKeep);
-    keeper->run();
     skippedTargets = keeper->getSkippedTargets();
 
     ra = new ReachabilityAnalysis(module, opts.EntryPoint, skippedTargets, *logFile);
