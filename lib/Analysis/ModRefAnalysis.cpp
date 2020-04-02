@@ -56,24 +56,21 @@ void ModRefAnalysis::run() {
         assert(false);
     }
 
-    vector<vector<string>::iterator> todel;
+    // vector<vector<string>::iterator> todel;
     for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
         string name = *i;
         Function *f = module->getFunction(name);
         if (!f) {
-            // errs() << "function '" << name << "' is not found (or unreachable)\n";
+            klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
+            // todel.push_back(i);
             // assert(false);
-            
-            // klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
-            // targets.erase(i);
-            todel.push_back(i);
             continue; // JOR: TODO: ensure safety
         }
         targetFunctions.push_back(f);
     }
-    for (vector<vector<string>::iterator>::iterator d = todel.begin(); d != todel.end(); d++) {
-        targets.erase(*d); // JOR: this doesn't seem to help with anything, remove
-    }
+    // for (vector<vector<string>::iterator>::iterator d = todel.begin(); d != todel.end(); d++) {
+    //     targets.erase(*d); // JOR: this doesn't seem to help with anything, remove
+    // }
 
     /* collect mod information for each target function */
     for (vector<Function *>::iterator i = targetFunctions.begin(); i != targetFunctions.end(); i++) {
