@@ -462,7 +462,7 @@ const Module *Executor::setModule(llvm::Module *module,
   specialFunctionHandler->prepare();
 
   logFile = interpreterHandler->openOutputFile("sa.log");
-  
+
   /* build target functions */
   std::vector<std::string> skippedTargets;
   keeper = new Keeper(module, interpreterOpts.skipMode, interpreterOpts.selectedFunctions, interpreterOpts.keptFunctions, interpreterOpts.autoKeep);
@@ -1734,6 +1734,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   // i->dump();
   static int instcount = 0;
   DEBUG_WITH_TYPE("instcount", if(instcount++ % 10 == 0) llvm::errs() << "|";);
+  DEBUG_WITH_TYPE("inst", llvm::errs() << "INSTRUCTION " << *ki->inst << "\n";);
   /* TODO: replace with a better predicate (call stack counter?) */
   if (state.isRecoveryState() && state.getExitInst() == i) {
     onRecoveryStateExit(state);

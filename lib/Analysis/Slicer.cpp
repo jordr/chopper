@@ -337,7 +337,11 @@ bool Slicer::buildDG()
     //pa->run();
 
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Points-to analysis took"));
+#else
+    tm.report("INFO: Points-to analysis took");
+#endif
 
     dg.build(M, PTA, M->getFunction(entryFunction));
 
@@ -423,7 +427,11 @@ bool Slicer::mark()
     }
 
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Finding dependent nodes took"));
+#else
+    tm.report("INFO: Finding dependent nodes took");
+#endif
 
     return true;
 }
@@ -437,19 +445,31 @@ void Slicer::computeEdges()
     tm.start();
     RD->run();
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Reaching defs analysis took"));
+#else
+    tm.report("INFO: Reaching defs analysis took");
+#endif
 
     LLVMDefUseAnalysis DUA(&dg, RD.get(), PTA, undefined_are_pure);
     tm.start();
     DUA.run(); // add def-use edges according that
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Adding Def-Use edges took"));
+#else
+    tm.report("INFO: Adding Def-Use edges took");
+#endif
 
     tm.start();
     // add post-dominator frontiers
     dg.computeControlDependencies(CdAlgorithm);
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Computing control dependencies took"));
+#else
+    tm.report("INFO: Computing control dependencies took");
+#endif
 }
 
 bool Slicer::slice()
@@ -469,10 +489,18 @@ bool Slicer::slice()
     slicer.slice(&dg, nullptr, slice_id);
 
     tm.stop();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, tm.report("INFO: Slicing dependence graph took"));
+#else
+    tm.report("INFO: Slicing dependence graph took");
+#endif
 
     analysis::SlicerStatistics& st = slicer.getStatistics();
+#ifndef MAKE_CHECK
     DEBUG_CHOPPER(DEBUG_RECOVERY_TIMERS, errs() << "INFO: Sliced away " << st.nodesRemoved
+#else
+    errs() << "INFO: Sliced away " << st.nodesRemovd
+#endif
         << " from " << st.nodesTotal << " nodes in DG\n");
 
     return true;
