@@ -10,7 +10,6 @@
 // CHECK-SNAPSHOTS: KLEE: done: created snapshots = 1
 
 // CHECK-PRINTF: KLEE: WARNING ONCE: calling external: printf(
-// CHECK-PTA: INFO: Points-to analysis took
 
 int foo(int x) {
   return x + 1;
