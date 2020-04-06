@@ -1,13 +1,12 @@
 // RUN: %llvmgcc %s -emit-llvm -O0 -c -o %t1.bc
 // RUN: rm -rf %t.klee-out
-// RUN: %klee --skip-functions=foo --output-dir=%t.klee-out %t1.bc > %t2.out 2> %t2.out
+// RUN: %klee --skip-functions-not=main,bar,printf --output-dir=%t.klee-out %t1.bc > %t2.out 2> %t2.out
 // RUN: FileCheck %s -input-file=%t2.out
 // RUN: test ! -f %t.klee-out/test000001.ptr.err
 
 // CHECK: 1 (good!)
 // CHECK: recovery states = 2
 // CHECK-NOT: (bad!)
-// CHECK-NOT: ASSERTION FAIL
 
 #include <stdio.h>
 
