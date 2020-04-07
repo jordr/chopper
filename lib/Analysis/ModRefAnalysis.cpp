@@ -191,8 +191,7 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
             if(insensitive) {
                 debugs << "\t\t" << nodeId << "(" << "insensitive" << "), ";
             } else {
-                debugs << "\t\t" << nodeId << "(" << "sensitive, "
-                    << "FIObjNode = " << aa->getPTA()->getFIObjNode(nodeId) << "), ";
+                debugs << "\t\t" << nodeId << "(" << "sensitive, " << "FIObjNode = " << aa->getPTA()->getFIObjNode(nodeId) << "), ";
             }
         }
         debugs << "]\n}\n";
@@ -219,14 +218,17 @@ void ModRefAnalysis::addStore(Function *f, Instruction *store) {
             objToStoreMap[k].insert(store);
             modPts.set(FInodeId);
 
-            std::string infoStr, storeStr;
-            llvm::raw_string_ostream infoSS(infoStr), storeSS(storeStr);
-            infoSS << *storeLocation.Ptr;
-            storeSS << *store;
-            // klee::klee_warning(
-            //     "Detected field-sensitive information '%s' used by store '%s', adding field-insensitive info.", 
-            //     infoSS.str().c_str(),
-            //     storeSS.str().c_str());
+            // DEBUG
+            /*
+                std::string infoStr, storeStr;
+                llvm::raw_string_ostream infoSS(infoStr), storeSS(storeStr);
+                infoSS << *storeLocation.Ptr;
+                storeSS << *store;
+                klee::klee_warning(
+                    "Detected field-sensitive information '%s' used by store '%s', adding field-insensitive info.", 
+                    infoSS.str().c_str(),
+                    storeSS.str().c_str());
+            //*/
         }
 
         /* TODO: check static objects? */
@@ -321,7 +323,15 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
             << "\tValueNodeID = " << id << ",\n"
             << "\tptsto = [";
         for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
-            debugs << *i << ", ";
+            NodeID nodeId = *i;
+            /* get allocation site */
+            assert(llvm::isa<ObjPN>(aa->getPTA()->getPAG()->getPAGNode(nodeId)));
+            bool insensitive =  aa->getPTA()->getFIObjNode(nodeId) == nodeId;
+            if(insensitive) {
+                debugs << "\t\t" << nodeId << "(" << "insensitive" << "), ";
+            } else {
+                debugs << "\t\t" << nodeId << "(" << "sensitive, " << "FIObjNode = " << aa->getPTA()->getFIObjNode(nodeId) << "), ";
+            }
         }
         debugs << "]\n}\n";
     );
@@ -332,13 +342,27 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
     for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
         NodeID nodeId = *i;
 
-        // check field sensitivity
+        // JOR: check field sensitivity
         bool insensitive = aa->getPTA()->getFIObjNode(nodeId) == nodeId;
         if(!insensitive) {
-            NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
-            pair<Function *, NodeID> k = make_pair(f, FInodeId);
-            objToLoadMap[k].insert(load);
-            refPts.set(FInodeId);
+            #if 1
+                NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
+                pair<Function *, NodeID> k = make_pair(f, FInodeId);
+                objToLoadMap[k].insert(load);
+                refPts.set(FInodeId);
+            #endif
+
+            // DEBUG
+            //*
+                std::string infoStr, loadStr;
+                llvm::raw_string_ostream infoSS(infoStr), loadSS(loadStr);
+                infoSS << *loadLocation.Ptr;
+                loadSS << *load;
+                klee::klee_warning(
+                    "Detected field-sensitive information '%s' used by load '%s', adding field-insensitive info.", 
+                    infoSS.str().c_str(),
+                    loadSS.str().c_str());
+            //*/
         }
 
         pair<Function *, NodeID> k = make_pair(f, nodeId);
