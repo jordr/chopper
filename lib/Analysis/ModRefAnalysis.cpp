@@ -331,6 +331,16 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
 
     for (PointsTo::iterator i = pts.begin(); i != pts.end(); ++i) {
         NodeID nodeId = *i;
+
+        // check field sensitivity
+        bool insensitive = aa->getPTA()->getFIObjNode(nodeId) == nodeId;
+        if(!insensitive) {
+            NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
+            pair<Function *, NodeID> k = make_pair(f, FInodeId);
+            objToLoadMap[k].insert(load);
+            refPts.set(FInodeId);
+        }
+
         pair<Function *, NodeID> k = make_pair(f, nodeId);
         objToLoadMap[k].insert(load);
     }
