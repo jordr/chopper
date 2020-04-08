@@ -103,14 +103,24 @@ bool ReachabilityAnalysis::run(bool usePA) {
   for (vector<string>::iterator i = m_targets.begin(); i != m_targets.end(); i++) {
     string name = *i;
     Function *f = module->getFunction(name);
-    if (!f) {
-      // errs() << "function '" << name << "' is not found\n";
-      // return false;
-      // JOR don't return here, treat this as non-critical
-      DEBUG_WITH_TYPE("chop", klee::klee_warning("[ReachabilityAnalysis] function '%s' is not found", name.c_str()));
-      continue;
+
+    if (f) {
+      all.push_back(f);
+    } else {
+      // JOR: TODO: this is dirty, and should be done differently, f.e. by generating a table from the ReturnToVoidFunction module
+      // assert(originalF->isVarArg()); 
+      for(int wrapperTry = 1; ;wrapperTry++) {
+        string vaarg_name = name + "_" + to_string(wrapperTry);
+        f = module->getFunction(vaarg_name);
+        if(!f) {
+          if(wrapperTry == 1)
+            klee::klee_warning("ReachabilityAnalysis: function '%s' is not found (or unreachable), and has no variadic wrappers.", name.c_str());
+          break;
+        }
+        DEBUG_WITH_TYPE("variadic", klee::klee_warning("ReachabilityAnalysis: Adding variadc wrapper %s", vaarg_name.c_str()));
+        all.push_back(f);
+      }
     }
-    all.push_back(f);
   }
 
   /* build reachability map */

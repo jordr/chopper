@@ -4906,7 +4906,21 @@ bool Executor::isFunctionToSkip(ExecutionState &state, Function *f) {
     else if(interpreterOpts.skipMode == CHOP_LEGACY) {
       for (auto i = interpreterOpts.selectedFunctions.begin(), e = interpreterOpts.selectedFunctions.end(); i != e; i++) {
         const SkippedFunctionOption &option = *i;
-        if ((option.name == f->getName().str())) {
+        
+        bool matches = option.name == f->getName().str();
+        if(!matches) {
+          // JOR: hacky, check if f has a vaarg suffix
+          std::string fname = f->getName().str();
+          if(fname.back() <= '9' && fname.back() >= '0') {
+            for(; !fname.empty() && fname.back() <= '9' && fname.back() >= '0'; fname.pop_back());
+            if(!fname.empty() && fname.back() == '_')
+              fname.pop_back();
+            if(option.name == fname)
+              matches = true;
+          }
+        }
+
+        if (matches) {
             Instruction *callInst = state.prevPC->inst;
             const InstructionInfo &info = kmodule->infos->getInfo(callInst);
             const std::vector<unsigned int> &lines = option.lines;

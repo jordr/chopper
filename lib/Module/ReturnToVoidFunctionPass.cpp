@@ -212,7 +212,11 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
   // we need to find a wrapper that matches the argument list of the call. this may take several tries
   for(int wrapperTry = 1; ; wrapperTry++) {
     // create a codified wrapper name
+#ifdef OLD_VARIADIC_WRAPPER_NOMENCLATURE
     string wrappedName = string("__wrap_") + f.getName().str() + "_vaarg" + std::to_string(totalArgCount) + "v" + std::to_string(wrapperTry);
+#else
+    string wrappedName = string("__wrap_") + f.getName().str() + "_" + std::to_string(wrapperTry);
+#endif
     // check if (wrapperTry < number of wrappers made)
     bool wrapperExists = module.getFunction(wrappedName) != NULL;
     if(!wrapperExists) { // easy: just make the wrapper and return
@@ -229,7 +233,8 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
     DEBUG_WITH_TYPE("variadic", klee_message("Wrapper '%s' already exists, and LLVM claims it is the right type:", wrappedName.c_str());
       llvm::errs() << "\e[0;36m\""; wrapper->dump(); llvm::errs() << "\"\e[0;m");
 
-    // TODO: JOR: I don't think this is useful anymore since LLVM does type checking
+    // JOR: I don't think this is useful anymore since LLVM does type checking
+#ifdef CHECK_LLVM_ANSWER
     // iterate over the call signature and the wrapper signature at the same time
     int argi = 0;
     llvm::Function::arg_iterator warg = wrapper->getArgumentList().begin();
@@ -250,6 +255,7 @@ Function * klee::ReturnToVoidFunctionPass::getOrMakeWrapper(Function& f, CallIns
         break; // bad wrapper, try another one
       }
     }
+#endif
   }
 }
 

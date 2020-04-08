@@ -300,9 +300,10 @@ bool Keeper::isFunctionToSkip(llvm::Function* f) {
   llvm::StringRef fname = f->getName();
   // hack for variadics (they are marked as __wrap_ but are not in the SkippedTargets)
   // we should consider all __wrap_* functions as SkippedTargets anyway
-  if(!fname.startswith(llvm::StringRef("__wrap_"))) {
-    // if it was marked as a function to keep from start
-    if(std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) == skippedTargets.end())
+  
+  // if it was marked as a function to keep from start
+  if(std::find(skippedTargets.begin(), skippedTargets.end(), fname.str()) == skippedTargets.end()) {
+    if(!fname.startswith(llvm::StringRef("__wrap_")))
       // definitely not a function to skip then
       return false;
   }

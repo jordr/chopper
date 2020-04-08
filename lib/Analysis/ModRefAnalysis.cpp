@@ -60,17 +60,24 @@ void ModRefAnalysis::run() {
     for (vector<string>::iterator i = targets.begin(); i != targets.end(); i++) {
         string name = *i;
         Function *f = module->getFunction(name);
-        if (!f) {
-            klee::klee_warning("[ModRefAnalysis] function '%s' is not found (or unreachable)", name.c_str());
-            // todel.push_back(i);
-            // assert(false);
-            continue; // JOR: TODO: ensure safety
+        if (f) {
+            targetFunctions.push_back(f);
+        } else {
+            // JOR: TODO: this is dirty, and should be done differently, f.e. by generating a table from the ReturnToVoidFunction module
+            // assert(originalF->isVarArg()); 
+            for(int wrapperTry = 1; ;wrapperTry++) {
+                string vaarg_name = name + "_" + to_string(wrapperTry);
+                f = module->getFunction(vaarg_name);
+                if(!f) {
+                    if(wrapperTry == 1)
+                        klee::klee_warning("ModRefAnalysis: function '%s' is not found (or unreachable), and has no variadic wrappers.", name.c_str());
+                    break;
+                }
+                DEBUG_WITH_TYPE("variadic", klee::klee_warning("ModRefAnalysis: Adding variadc wrapper %s", vaarg_name.c_str()));
+                targetFunctions.push_back(f);
+            }
         }
-        targetFunctions.push_back(f);
     }
-    // for (vector<vector<string>::iterator>::iterator d = todel.begin(); d != todel.end(); d++) {
-    //     targets.erase(*d); // JOR: this doesn't seem to help with anything, remove
-    // }
 
     /* collect mod information for each target function */
     for (vector<Function *>::iterator i = targetFunctions.begin(); i != targetFunctions.end(); i++) {
@@ -343,14 +350,13 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
         NodeID nodeId = *i;
 
         // JOR: check field sensitivity
+        #if BUGGY_LOAD_FIELDSENSITIVITY
         bool insensitive = aa->getPTA()->getFIObjNode(nodeId) == nodeId;
         if(!insensitive) {
-            #if 1
-                NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
-                pair<Function *, NodeID> k = make_pair(f, FInodeId);
-                objToLoadMap[k].insert(load);
-                refPts.set(FInodeId);
-            #endif
+            NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
+            pair<Function *, NodeID> k = make_pair(f, FInodeId);
+            objToLoadMap[k].insert(load);
+            refPts.set(FInodeId);
 
             // DEBUG
             //*
@@ -364,6 +370,7 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
                     loadSS.str().c_str());
             //*/
         }
+        #endif
 
         pair<Function *, NodeID> k = make_pair(f, nodeId);
         objToLoadMap[k].insert(load);
