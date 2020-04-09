@@ -1,7 +1,7 @@
 /* From Feature/Vararg.c */
 // RUN: %llvmgcc %s -emit-llvm -O0 -c -o %t1.bc
 // RUN: rm -rf %t.klee-out
-// RUN: %klee --skip-functions-not=main,,__assert_fail --output-dir=%t.klee-out %t1.bc > %t2.out 2> %t2.out
+// RUN: %klee --skip-functions-not=main,printf,__assert_fail --output-dir=%t.klee-out %t1.bc > %t2.out 2> %t2.out
 // RUN: grep "types: (52, 37, 2.00, (9,12,15))" %t2.out
 // RUN: FileCheck %s -input-file=%t2.out
 // RUN: test ! -f %t.klee-out/test000001.ptr.err
