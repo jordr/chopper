@@ -350,7 +350,7 @@ void ModRefAnalysis::addLoad(Function *f, Instruction *load) {
         NodeID nodeId = *i;
 
         // JOR: check field sensitivity
-        #if BUGGY_LOAD_FIELDSENSITIVITY
+        #if 0
         bool insensitive = aa->getPTA()->getFIObjNode(nodeId) == nodeId;
         if(!insensitive) {
             NodeID FInodeId = aa->getPTA()->getFIObjNode(nodeId);
