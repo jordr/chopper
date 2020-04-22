@@ -5178,10 +5178,24 @@ void Executor::restartExecutionWithFunction(llvm::Function *f, bool singleTimer)
     }
     CallStr << argvi << ' ';
   }
+
+  std::string CallStrQuoted = CallStr.str();
+  // escape double quotes
+  {
+    const std::string s = "\"";
+    const std::string t = "\\\"";
+    std::string::size_type n = 0;
+    while((n = CallStrQuoted.find(s, n)) != std::string::npos)
+    {
+        CallStrQuoted.replace(n, s.size(), t);
+        n += t.size();
+    }
+  }
+
   klee_message("======================================================================"
-    "\nRestarting KLEE with \e[45;1m%s\e[0m", CallStr.str().c_str());
+    "\nRestarting KLEE with \e[45;1m%s\e[0m", CallStrQuoted.c_str());
   klee_message("======================================================================");
-  system(CallStr.str().c_str());
+  system(CallStrQuoted.c_str());
 
   // llvm::StringMap<llvm::cl::Option*> Map;
   // llvm::cl::getRegisteredOptions(Map);
