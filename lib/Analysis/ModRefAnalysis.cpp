@@ -69,8 +69,8 @@ void ModRefAnalysis::run() {
                 string vaarg_name = name + "_" + to_string(wrapperTry);
                 f = module->getFunction(vaarg_name);
                 if(!f) {
-                    if(wrapperTry == 1)
-                        klee::klee_warning("ModRefAnalysis: function '%s' is not found (or unreachable), and has no variadic wrappers.", name.c_str());
+                    // if(wrapperTry == 1)
+                    //     klee::klee_warning("ModRefAnalysis: function '%s' is not found (or unreachable), and has no variadic wrappers.", name.c_str());
                     break;
                 }
                 DEBUG_WITH_TYPE("variadic", klee::klee_warning("ModRefAnalysis: Adding variadc wrapper %s", vaarg_name.c_str()));
