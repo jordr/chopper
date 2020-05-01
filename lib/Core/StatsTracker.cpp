@@ -177,7 +177,7 @@ static bool instructionIsCoverable(Instruction *i) {
   return true;
 }
 
-StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
+StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename, llvm::raw_fd_ostream* coverageLog,
                            bool _updateMinDistToUncovered)
   : executor(_executor),
     objectFilename(_objectFilename),
@@ -187,6 +187,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     numBranches(0),
     fullBranches(0),
     partialBranches(0),
+    coverageLog(coverageLog),
     updateMinDistToUncovered(_updateMinDistToUncovered) {
 
   if (StatsWriteAfterInstructions > 0 && StatsWriteInterval > 0)
@@ -325,6 +326,9 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
         // FIXME: This trick no longer works, we should fix this in the line
         // number propogation.
           es.coveredLines[&ii.file].insert(ii.line);
+        if (coverageLog)
+          // format: delta time,asm line,file,src line,instructions
+          *coverageLog << elapsed() << ',' << ii.assemblyLine << ',' << ii.file << ',' << ii.line << ',' << stats::instructions << '\n';
 	es.coveredNew = true;
         es.instsSinceCovNew = 1;
 	++stats::coveredInstructions;
