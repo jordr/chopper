@@ -44,6 +44,7 @@ namespace klee {
 
     CallPathManager callPathManager;    
 
+    llvm::raw_fd_ostream* coverageLog;
     bool updateMinDistToUncovered;
 
   public:
@@ -57,7 +58,8 @@ namespace klee {
 
   public:
     StatsTracker(Executor &_executor, std::string _objectFilename,
-                 bool _updateMinDistToUncovered);
+             llvm::raw_fd_ostream* coverageLog,
+             bool _updateMinDistToUncovered);
     ~StatsTracker();
 
     // called after a new StackFrame has been pushed (for callpath tracing)
