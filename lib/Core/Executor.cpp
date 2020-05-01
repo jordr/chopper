@@ -492,6 +492,7 @@ const Module *Executor::setModule(llvm::Module *module,
     statsTracker = 
       new StatsTracker(*this,
                        interpreterHandler->getOutputFilename("assembly.ll"),
+                       interpreterHandler->openOutputFile("coverage.log"), // insert this line
                        userSearcherRequiresMD2U());
   }
 
@@ -4468,7 +4469,6 @@ void Executor::onRecoveryStateExit(ExecutionState &state) {
   DEBUG_WITH_TYPE(DEBUG_BASIC, klee_message("%p: recovery state reached exit instruction", &state));
 
   ExecutionState *dependentState = state.getDependentState();
-  //dumpConstrains(*dependentState);
   { // JOR: debug
     std::string prefix = state.isRecoveryState() && state.getLevel() ? "[L" + std::to_string(state.getLevel()) + "] " : ""; // display recovery level
     for(unsigned i = 0; i < dependentState->stack.size(); i++) {
