@@ -5195,9 +5195,10 @@ void Executor::restartExecutionWithFunction(llvm::Function *f, bool singleTimer)
   klee_message("======================================================================"
     "\nRestarting KLEE with \e[45;1m%s\e[0m", CallStrQuoted.c_str());
   klee_message("======================================================================");
-  system(CallStrQuoted.c_str());
+  llvm::raw_fd_ostream* restartLog = interpreterHandler->openOutputFile("restart.sh");
+  *restartLog << CallStrQuoted.c_str() << "\n";
 
-  exit(0);
+  // exit(0);
 }
 
 // JOR
