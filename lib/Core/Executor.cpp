@@ -5223,11 +5223,11 @@ void Executor::restartExecutionWithFunction(llvm::Function *f, bool singleTimer)
   klee_message("======================================================================"
     "\nRestarting KLEE with \e[45;1m%s\e[0m", CallStrQuoted.c_str());
   klee_message("======================================================================");
-  system(CallStrQuoted.c_str());
+  llvm::raw_fd_ostream* restartLog = interpreterHandler->openOutputFile("restart.sh");
+  assert(restartLog && "cant open restart.sh file");
+  *restartLog << CallStrQuoted << "\n";
+  restartLog->close();
 
-  // llvm::StringMap<llvm::cl::Option*> Map;
-  // llvm::cl::getRegisteredOptions(Map);
-  // for(llvm::StringMapIterator<llvm::cl::Option*> i = Map.begin(); i != Map.end(); i++)
 }
 
 // JOR
