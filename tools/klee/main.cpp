@@ -133,6 +133,10 @@ namespace {
                 cl::desc("Comma-separated list of locations where a failure is expected (e.g. <file1>[:line],<file2>[:line],..)"));
 
   cl::opt<std::string>
+  BreakpointLocation("breakpoint-location",
+                cl::desc("Comma-separated list of locations where the analysis should halt, once all are reached"));
+
+  cl::opt<std::string>
   EntryPoint("entry-point",
              cl::desc("Consider the function with the given name as the entrypoint"),
              cl::init("main"));
@@ -1560,8 +1564,9 @@ int main(int argc, char **argv, char **envp) {
   std::vector<std::string> inlinedFunctions;
   parseInlinedFunctions(mainModule, InlinedFunctions, inlinedFunctions);
 
-  std::map<std::string, std::vector<unsigned> > errorLocationOptions;
+  std::map<std::string, std::vector<unsigned> > errorLocationOptions, breakpointLocationOptions;
   parseErrorLocationParameter(ErrorLocation, errorLocationOptions);
+  parseErrorLocationParameter(BreakpointLocation, breakpointLocationOptions);
 
   // FIXME: Change me to std types.
   int pArgc;
@@ -1615,6 +1620,7 @@ int main(int argc, char **argv, char **envp) {
   IOpts.keptFunctions = keptOptions;
   IOpts.inlinedFunctions = inlinedFunctions;
   IOpts.errorLocations = errorLocationOptions;
+  IOpts.breakpointLocations = breakpointLocationOptions;
   IOpts.maxErrorCount = MaxErrorCount;
   IOpts.autoKeep = AutoKeep;
   IOpts.cumulativeRecoveryTimeThresold = CumulativeRecoveryTimeThresold;

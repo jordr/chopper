@@ -126,6 +126,7 @@ public:
     int cumulativeRecoveryTimeThresold, singleRecoveryTimeThresold;
     std::vector<std::string> inlinedFunctions;
     ErrorLocations errorLocations;
+    ErrorLocations breakpointLocations;
     unsigned int maxErrorCount;
 
     InterpreterOptions() : 

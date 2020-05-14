@@ -1742,6 +1742,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     return;
   }
 
+  checkBreakpointLocations(state);
+
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -3320,6 +3322,32 @@ void Executor::terminateStateOnError(ExecutionState &state,
       if (errorLocations.empty()) {
         haltExecution = true;
       }
+    }
+  }
+}
+
+// AutoChopper
+void Executor::checkBreakpointLocations(ExecutionState &state) {
+  Instruction* lastInst;
+  const InstructionInfo &ii = getLastNonKleeInternalInstruction(state, &lastInst);
+
+  InterpreterOptions::ErrorLocations &breakpointLocations = interpreterOpts.breakpointLocations;
+  if (!breakpointLocations.empty()) {
+    for (std::vector<ErrorLocationOption>::size_type i = 0; i < breakpointLocations.size(); ++i) {
+      std::string basename = ii.file.substr(ii.file.find_last_of("/\\") + 1);
+      InterpreterOptions::ErrorLocations::iterator entry = breakpointLocations.find(basename);
+      if (entry != breakpointLocations.end()) {
+        entry->second.erase(std::remove(entry->second.begin(), entry->second.end(), ii.line), entry->second.end());
+        if (entry->second.empty()) {
+          breakpointLocations.erase(entry);
+        }
+        break;
+      }
+    }
+    if (breakpointLocations.empty()) {
+      klee::klee_message("ERROR: all breakpoint locations reached, stopping at %s:%u",
+        ii.file.substr(ii.file.find_last_of("/\\") + 1).c_str(), ii.line);
+      haltExecution = true;
     }
   }
 }
