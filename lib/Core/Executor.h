@@ -428,6 +428,8 @@ private:
     terminateStateOnError(state, message, Exec, NULL, info);
   }
 
+  void checkBreakpointLocations(ExecutionState &state);
+
   /// bindModuleConstants - Initialize the module constant table.
   void bindModuleConstants();
 
