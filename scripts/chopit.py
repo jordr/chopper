@@ -29,7 +29,8 @@ def main(main_args):
     parser.add_argument('-o', help='Output module', action='store_true')
     parser.add_argument('-i', help='Interactive mode', action='store_true')
     # from KLEE
-    parser.add_argument('-w', '--wfilter', help='Warnings to filter out (KLEE option)')
+    # parser.add_argument('-w', '--wfilter', help='Warnings to filter out (KLEE option)')
+    parser.add_argument('-c', '--command', help='Additional command (KLEE)')
     parser.add_argument('--inline', help='(KLEE option)')
     parser.add_argument('--debugonly', help='(KLEE option)')
     # from diffanalyze
@@ -73,31 +74,41 @@ def main(main_args):
     print("No-skip functions list: " + colored(noskip, 'green'))
 
     # Get callgraph
-    print ("Generating callgraph.dot...")
-    os.system("opt -dot-callgraph " + args['file'] + " 1>/dev/null")
-    print ("...\033[1;32m OK\033[0m")
-    print ("Generating callgraph-chopped.dot...", end='', flush=True)
-    os.system("choppy-dot " + noskip + " ./callgraph")
-    print ("\033[1;32m OK\033[0m")
-    os.system("mv -v callgraph.dot callgraph-raw.dot")
-    os.system("mv -v callgraph-chopped.dot callgraph-raw-chopped.dot")
+    if(args['o']):
+        print ("Generating callgraph.dot...")
+        os.system("opt -dot-callgraph " + args['file'] + " 1>/dev/null")
+        print ("...\033[1;32m OK\033[0m")
+        print ("Generating callgraph-chopped.dot...", end='', flush=True)
+        os.system("choppy-dot " + noskip + " ./callgraph")
+        print ("\033[1;32m OK\033[0m")
+        os.system("mv -v callgraph.dot callgraph-raw.dot")
+        os.system("mv -v callgraph-chopped.dot callgraph-raw-chopped.dot")
 
     # CHOPPER
     klee_params = ""
-    if args['wfilter']:
-        klee_params += " -w=" + args['wfilter']
+    # if args['wfilter']:
+        # klee_params += " -w=" + args['wfilter']
+    if args['command']:
+        klee_params += " " + args['command']
     if args['inline']:
         klee_params += " --inline=" + args['inline']
     if args['debugonly']:
         klee_params += " --debug-only=" + args['debugonly']
     if args['o']:
     	klee_params += " -output-module"
-    klee_command="klee -libc=uclibc -simplify-sym-indices -search=nurs:covnew -split-search -skip-functions-not=" + noskip + klee_params + " " + args['file']
+    klee_command="klee -libc=uclibc -posix-runtime -exit-on-error-type=Ptr -skip-functions-not=" + noskip + klee_params + " " + args['file']
     print("Running Chopper...\n" + colored(klee_command, 'yellow'))
     if args['i']:
         input("...")
 
     os.system(klee_command)
+
+    while os.path.exists("klee-last/restart.sh"):
+        restartFile = open('klee-last/restart.sh', 'r') 
+        Lines = restartFile.readlines()
+        for line in Lines:
+            print("Executing {}".format(line.strip()))
+            os.system(line.strip())
 
     if(args['o']):
 	    print ("Generating callgraph.dot...")
